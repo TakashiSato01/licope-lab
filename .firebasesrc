@@ -1,0 +1,6 @@
+{
+  "projects": {
+    "default": "licope-development",
+    "prod": "licope-production"
+  }
+}

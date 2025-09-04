@@ -1,0 +1,8 @@
+/* src/App.css */
+.app-container { max-width: 800px; margin: 0 auto; padding: 2rem; }
+.card { background-color: #242424; padding: 1.5rem; border-radius: 8px; margin-bottom: 2rem; }
+input { width: calc(100% - 20px); padding: 10px; margin-bottom: 10px; background-color: #333; border: 1px solid #555; color: #fff; }
+button { padding: 10px 20px; cursor: pointer; }
+table { width: 100%; border-collapse: collapse; }
+th, td { border: 1px solid #444; padding: 8px; text-align: left; }
+th { background-color: #333; }
