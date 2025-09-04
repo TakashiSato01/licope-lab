@@ -56,7 +56,7 @@ function App() {
 
     return (
         <div className="app-container">
-            <h1>Licope-Lab: Job Board v3</h1>
+            <h1>Licope-Lab: Job Board v2</h1>
             
             <div className="card">
                 <h2>新しい求人を作成</h2>
