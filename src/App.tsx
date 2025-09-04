@@ -69,7 +69,7 @@ function App() {
                     />
                     <input
                         type="number"
-                        value={wage
+                        value={wage}
                         onChange={(e) => setWage(Number(e.target.value))}
                         placeholder="給与"
                     />
