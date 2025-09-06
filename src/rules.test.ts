@@ -28,4 +28,19 @@ describe("Firestore Security Rules", () => {
         const authedDb = testEnv.authenticatedContext("user_abc").firestore();
         await assertSucceeds(authedDb.collection("jobs").add({ title: "A", wage: 1000 }));
     });
+    
+    test("オーナーではない認証ユーザーは、organizationsコレクションに書き込めない", async () => {
+      const orgId = "org_xyz";
+      const userId = "user_abc";
+
+  // 事前準備: 管理者視点でシードデータ作成
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        await ctx.firestore().doc(`organizations/${orgId}`).set({ name: "Initial Corp" });
+    });
+
+  // 検証: 認証済みでも一般ユーザーは書けない
+      const userDb = testEnv.authenticatedContext(userId).firestore();
+      await assertFails(userDb.doc(`organizations/${orgId}`).set({ name: "Test Corp" }));
+  });
+
 });
