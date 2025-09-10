@@ -1,29 +1,30 @@
-// src/main.tsx
-import React from 'react';
-import ReactDOM from 'react-dom/client';
+import React, { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
-import App from './App.tsx';
-import JobsPage from './pages/JobsPage.tsx'; // 作成したページをimport
-import './index.css';
+import "./index.css";
 
-// 住所録を作成
+import Dashboard from "./pages/Dashboard";
+import DashboardHome from "./pages/DashboardHome";
+import JobsPage from "./pages/JobsPage";
+import RicologPage from "./pages/RicologPage";
+
 const router = createBrowserRouter([
-    {
-        path: "/",
-        element: <App />, // 全てのページの"親"となる枠組み
-        children: [
-            {
-                index: true, // "/"（トップページ）に来たら、これを表示
-                element: <JobsPage />,
-            },
-            // 将来、ここに新しいページを追加していく
-            // { path: "lp-builder", element: <LpBuilderPage /> },
-        ],
-    },
+  {
+    path: "/",
+    element: <Dashboard />, // 共通レイアウト
+    children: [
+      { index: true, element: <DashboardHome /> }, // "/" に来たらKPI+一覧
+      { path: "jobs", element: <JobsPage /> },
+      { path: "ricolog", element: <RicologPage /> },
+      // { path: "works", element: <WorksPage /> },
+      // { path: "analytics", element: <AnalyticsPage /> },
+      // { path: "settings", element: <SettingsPage /> },
+    ],
+  },
 ]);
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-    <React.StrictMode>
-        <RouterProvider router={router} />
-    </React.StrictMode>,
+createRoot(document.getElementById("root")!).render(
+  <StrictMode>
+    <RouterProvider router={router} />
+  </StrictMode>
 );
