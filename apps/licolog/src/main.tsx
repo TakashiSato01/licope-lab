@@ -1,15 +1,21 @@
-import { ensureSignedIn } from './lib/firebase';
-ensureSignedIn().catch(console.error);
+// apps/licolog/src/main.tsx
 import React from "react";
-import { createRoot } from "react-dom/client";
-import { createBrowserRouter, RouterProvider } from "react-router-dom";
-import "./index.css";
-import { routes } from "./app/routes";
+import ReactDOM from "react-dom/client";
+import "./index.css"; // ← ここがポイント
+import { ensureSignedIn } from "./lib/firebase";
+import Home from "./pages/Home";
 
-const router = createBrowserRouter(routes);
+const root = ReactDOM.createRoot(document.getElementById("root")!);
 
-createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>
-    <RouterProvider router={router} />
-  </React.StrictMode>
-);
+// 匿名サインインが完了してから描画（ルールで request.auth != null を満たす）
+ensureSignedIn()
+  .catch((e) => {
+    console.error("Auth init failed", e);
+  })
+  .finally(() => {
+    root.render(
+      <React.StrictMode>
+        <Home />
+      </React.StrictMode>
+    );
+  });

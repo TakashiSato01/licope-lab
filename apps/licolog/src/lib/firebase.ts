@@ -1,27 +1,46 @@
 // apps/licolog/src/lib/firebase.ts
-import { initializeApp } from 'firebase/app';
-import { getAuth, connectAuthEmulator, signInAnonymously } from 'firebase/auth';
-import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
+import { initializeApp } from "firebase/app";
+import {
+  getAuth,
+  signInAnonymously,
+  onAuthStateChanged,
+  connectAuthEmulator,
+} from "firebase/auth";
+import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
 
-const firebaseConfig = {
-  apiKey: 'demo',
-  authDomain: 'demo',
-  projectId: 'licope-lab-test',
-};
+const app = initializeApp({
+  apiKey: "demo",
+  authDomain: "localhost",
+  projectId: "licope-lab",
+});
 
-export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 
-// エミュ接続
-if (location.hostname === 'localhost') {
-  connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
-  connectFirestoreEmulator(db, '127.0.0.1', 8080);
-}
+// Emulator
+connectAuthEmulator(auth, "http://127.0.0.1:9099");
+connectFirestoreEmulator(db, "127.0.0.1", 8080);
 
-// 起動時に匿名ログイン（未ログイン時のみ）
-export async function ensureSignedIn() {
-  if (!auth.currentUser) {
-    await signInAnonymously(auth);
-  }
+// 匿名ログインを保証（描画前に await される想定）
+export async function ensureSignedIn(): Promise<void> {
+  if (auth.currentUser) return;
+  await new Promise<void>((resolve, reject) => {
+    const unsub = onAuthStateChanged(
+      auth,
+      async (user) => {
+        if (user) {
+          unsub();
+          resolve();
+        } else {
+          try {
+            await signInAnonymously(auth);
+          } catch (e) {
+            unsub();
+            reject(e);
+          }
+        }
+      },
+      reject
+    );
+  });
 }

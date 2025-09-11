@@ -24,10 +24,14 @@ describe("Firestore Security Rules", () => {
         await assertFails(anonDb.collection("jobs").add({ title: "B" }));
     });
 
-    test("認証されたユーザーは、jobsコレクションに書き込める", async () => {
-        const authedDb = testEnv.authenticatedContext("user_abc").firestore();
-        await assertSucceeds(authedDb.collection("jobs").add({ title: "A", wage: 1000 }));
-    });
+// apps/admin/src/rules.test.ts
+test("認証されたユーザーは、jobsコレクションに書き込める", async () => {
+  const authedDb = testEnv.authenticatedContext("user_abc").firestore();
+  const orgId = "demo-org";
+  await assertSucceeds(
+    authedDb.collection(`organizations/${orgId}/jobs`).add({ title: "A", wage: 1000, orgId })
+  );
+});
     
     test("オーナーではない認証ユーザーは、organizationsコレクションに書き込めない", async () => {
       const orgId = "org_xyz";

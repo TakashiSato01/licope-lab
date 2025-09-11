@@ -1,4 +1,3 @@
-// firestore.rules（最小）
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -6,18 +5,21 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // 例: /organizations/{orgId}/licologPosts/{postId}
     match /organizations/{orgId} {
+      // licologPosts: 作成は認証 + pending + orgId一致
       match /licologPosts/{postId} {
-        // 作成: 認証必須 + pending であること + orgId 整合
         allow create: if signedIn()
           && request.resource.data.status == 'pending'
           && request.resource.data.orgId == orgId;
+        allow read: if signedIn();              // 社内ウォール想定
+        allow update, delete: if false;         // 承認UI実装後に開ける
+      }
 
-        // 読み取り（社内ウォール用。必要に応じて絞る）
+      // jobs: とりあえず作成だけ認証 + orgId一致で許可（MVP）
+      match /jobs/{jobId} {
+        allow create: if signedIn()
+          && request.resource.data.orgId == orgId;
         allow read: if signedIn();
-
-        // 更新・削除は今は閉じておく（承認UIができたら個別に開ける）
         allow update, delete: if false;
       }
     }
