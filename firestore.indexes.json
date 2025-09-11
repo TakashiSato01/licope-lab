@@ -43,8 +43,17 @@
   //     "multikey": true,
   //     "fields": [
   //       { "fieldPath": "baz", "mode": "ASCENDING" }
-  //     ]
-  //   },
+  //      ]
+  //     },
+  //     {
+  //      "collectionGroup": "licologPosts",
+  //           "queryScope": "COLLECTION",
+  //           "fields": [
+  //              { "fieldPath": "createdAt", "order": "DESCENDING" }
+  //           ]
+  //          }
+  //    ]
+  //   }
   // ]
   "indexes": [],
   "fieldOverrides": []

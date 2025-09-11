@@ -1,23 +1,32 @@
-import { db } from "../firebase";
+// apps/licolog/src/lib/repositories/licolog.ts
 import {
-  addDoc, collection, onSnapshot, orderBy, query, serverTimestamp, where,
-} from "firebase/firestore";
+  addDoc, collection, getDocs, limit, orderBy, query,
+  serverTimestamp, where, CollectionReference, QueryDocumentSnapshot,
+} from 'firebase/firestore'
+import { db } from '../firebase'
+import type { LicologPost } from '../types'
 
-export function listenOrgWall(orgId: string, cb: (docs: any[]) => void) {
-  const q = query(
-    collection(db, "organizations", orgId, "licologPosts"),
-    // MVPでは internal も含めてOK（法人内）
-    orderBy("createdAt", "desc"),
-  );
-  return onSnapshot(q, (snap) => {
-    cb(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-  });
-}
+const col = (orgId: string) =>
+  collection(db, 'organizations', orgId, 'licologPosts') as CollectionReference<LicologPost>
 
-export async function addPost(orgId: string, data: any) {
-  return addDoc(collection(db, "organizations", orgId, "licologPosts"), {
-    ...data,
+// 作成（常に status='pending' で入れる）
+export async function createPost(input: Omit<LicologPost, 'id' | 'status' | 'createdAt' | 'updatedAt'>) {
+  const docRef = await addDoc(col(input.orgId), {
+    ...input,
+    status: 'pending',
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
-  });
+  })
+  return docRef.id
+}
+
+// 法人横断ウォール（orgId の時系列 desc）
+export async function fetchLatest(orgId: string, take = 30) {
+  const q = query(
+    col(orgId),
+    orderBy('createdAt', 'desc'),
+    limit(take),
+  )
+  const snap = await getDocs(q)
+  return snap.docs.map(d => ({ id: d.id, ...(d.data()) }))
 }

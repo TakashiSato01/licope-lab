@@ -1,3 +1,5 @@
+import { ensureSignedIn } from './lib/firebase';
+ensureSignedIn().catch(console.error);
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";

@@ -1,12 +1,25 @@
+// firestore.rules（最小）
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /jobs/{id} {
-      allow read, create: if request.auth != null;
-      allow update, delete: if false;
+    function signedIn() {
+      return request.auth != null;
     }
-  match /organizations/{orgId} {
-  allow read, write: if false;
+
+    // 例: /organizations/{orgId}/licologPosts/{postId}
+    match /organizations/{orgId} {
+      match /licologPosts/{postId} {
+        // 作成: 認証必須 + pending であること + orgId 整合
+        allow create: if signedIn()
+          && request.resource.data.status == 'pending'
+          && request.resource.data.orgId == orgId;
+
+        // 読み取り（社内ウォール用。必要に応じて絞る）
+        allow read: if signedIn();
+
+        // 更新・削除は今は閉じておく（承認UIができたら個別に開ける）
+        allow update, delete: if false;
+      }
     }
   }
 }

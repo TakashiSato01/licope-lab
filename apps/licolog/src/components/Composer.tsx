@@ -1,31 +1,56 @@
+// apps/licolog/src/components/Composer.tsx
 import React, { useState } from "react";
+import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { db } from "../lib/firebase"; // ← あなたのパスに合わせて
+
+// いったんハードコード（認証を入れたら claims から取る）
+const ORG_ID = "demo-org";
+const FACILITY_ID = "demo-facility";
 
 export default function Composer() {
   const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  const onSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: repositories/licolog.addPost(...) に接続
-    if (!text.trim()) return;
-    setText("");
+    if (!text.trim() || busy) return;
+
+    setBusy(true);
+    try {
+      await addDoc(collection(db, `organizations/${ORG_ID}/licologPosts`), {
+        body: text.trim(),
+        media: [],                     // 画像は後で
+        authorUid: "debug-user",       // 認証後に request.auth.uid に置換
+        orgId: ORG_ID,
+        facilityId: FACILITY_ID,
+        status: "pending",             // ★ ここが今回の要件
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      setText("");
+    } catch (err) {
+      console.error("create licolog post failed:", err);
+      alert("投稿に失敗しました");
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
-    <form
-      onSubmit={onSubmit}
-      className="fixed inset-x-0 bottom-0 bg-neutral-900 border-t border-neutral-800 p-3"
-    >
-      <div className="max-w-xl mx-auto flex gap-2">
-        <input
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder="いまの様子を投稿..."
-          className="flex-1 rounded-lg bg-neutral-800 px-3 py-2 outline-none"
-        />
-        <button className="rounded-lg px-4 py-2 bg-blue-600 font-medium">
-          投稿
-        </button>
-      </div>
+    <form onSubmit={handleSubmit} className="fixed bottom-0 left-0 right-0 bg-black/70 p-4 flex gap-2">
+      <input
+        className="flex-1 rounded-md bg-neutral-900 px-4 py-3 outline-none"
+        placeholder="いまの様子を投稿..."
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+      />
+      <button
+        type="submit"
+        disabled={busy || !text.trim()}
+        className="rounded-md px-4 py-3 bg-neutral-800 disabled:opacity-50"
+      >
+        投稿
+      </button>
     </form>
   );
 }
