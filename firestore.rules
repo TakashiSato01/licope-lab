@@ -1,26 +1,35 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    function signedIn() {
-      return request.auth != null;
-    }
+    function signedIn() { return request.auth != null; }
 
     match /organizations/{orgId} {
-      // licologPosts: 作成は認証 + pending + orgId一致
+      // リコログ
       match /licologPosts/{postId} {
+        // 作成: 認証済み + pending + orgId一致
         allow create: if signedIn()
           && request.resource.data.status == 'pending'
           && request.resource.data.orgId == orgId;
-        allow read: if signedIn();              // 社内ウォール想定
-        allow update, delete: if false;         // 承認UI実装後に開ける
+
+        // 読み取り（list/get）
+        allow read: if signedIn();
+
+        // 承認: pending → approved のみ許可（orgId は変えられない）
+        allow update: if signedIn()
+          && resource.data.orgId == orgId
+          && request.resource.data.orgId == orgId
+          && resource.data.status == 'pending'
+          && request.resource.data.status == 'approved';
+
+        // 削除はNG
+        allow delete: if false;
       }
 
-      // jobs: とりあえず作成だけ認証 + orgId一致で許可（MVP）
-      match /jobs/{jobId} {
+      // 承認イベントの記録
+      match /events/{eventId} {
         allow create: if signedIn()
           && request.resource.data.orgId == orgId;
-        allow read: if signedIn();
-        allow update, delete: if false;
+        allow read, update, delete: if false;
       }
     }
   }

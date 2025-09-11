@@ -1,12 +1,15 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+// apps/admin/vite.config.ts
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import path from "node:path";
 
-// https://vite.dev/config/
 export default defineConfig({
   root: __dirname, 
   plugins: [react()],
-  server: { port: 5173 },
-  test: {
-    environment: 'node', 
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "./src"), // ← これで "@/..." が使える
+    },
   },
+  server: { port: 5173 },
 });

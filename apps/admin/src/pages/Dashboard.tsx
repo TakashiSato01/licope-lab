@@ -65,7 +65,7 @@ export default function Dashboard() {
             <div className="flex-1">
               <NavItem to="/" collapsed={collapsed} icon={LayoutDashboard} label="ダッシュボード" end />
               <NavItem to="/jobs" collapsed={collapsed} icon={FileText} label="求人ページ" />
-              <NavItem to="/ricolog" collapsed={collapsed} icon={MessageSquare} label="リコログ" />
+              <NavItem to="/Licolog" collapsed={collapsed} icon={MessageSquare} label="リコログ" />
               <NavItem to="/works" collapsed={collapsed} icon={Briefcase} label="リコペワークス" />
               <NavItem to="/analytics" collapsed={collapsed} icon={BarChart3} label="詳細分析" />
 

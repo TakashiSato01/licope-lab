@@ -23,15 +23,15 @@ function Sparkline({ series }: { series: number[] }) {
   return <svg viewBox="0 0 160 48" className="w-full h-12"><path d={path} fill="none" stroke="#f579a4" strokeWidth={2} /></svg>;
 }
 
-type Kpi = { key:'views'|'applies'|'ricologPosts'|'ricologPublishes'; label:string; value:number; diff:number; series:number[] };
+type Kpi = { key:'views'|'applies'|'LicologPosts'|'LicologPublishes'; label:string; value:number; diff:number; series:number[] };
 type JobItem = { id:string; title:string; status:'公開中'|'下書き'; thumbnail?:string };
-type RicologItem = { id:string; date:string; excerpt:string; author:string; thumbnail?:string };
+type LicologItem = { id:string; date:string; excerpt:string; author:string; thumbnail?:string };
 
 const kpis: Kpi[] = [
   { key:'views', label:'求人ページ閲覧数', value:1088, diff:+110, series:[12,18,11,25,19,30,28,40,35,45,42,55] },
   { key:'applies', label:'応募数', value:5, diff:-80, series:[8,7,6,5,4,6,4,3,2,4,3,2] },
-  { key:'ricologPosts', label:'リコログ投稿数', value:33, diff:+125, series:[2,3,2,4,5,4,6,7,6,8,7,9] },
-  { key:'ricologPublishes', label:'リコログ公開数', value:21, diff:+200, series:[1,1,1,2,2,3,3,4,4,5,5,6] },
+  { key:'LicologPosts', label:'リコログ投稿数', value:33, diff:+125, series:[2,3,2,4,5,4,6,7,6,8,7,9] },
+  { key:'LicologPublishes', label:'リコログ公開数', value:21, diff:+200, series:[1,1,1,2,2,3,3,4,4,5,5,6] },
 ];
 
 const jobs: JobItem[] = [
@@ -40,7 +40,7 @@ const jobs: JobItem[] = [
   { id:'j3', title:'介護職正社員の募集【盛岡市本宮】※デイサービス', status:'下書き' },
 ];
 
-const ricologs: RicologItem[] = [
+const Licologs: LicologItem[] = [
   { id:'r1', date:'2025/09/06(土)', excerpt:'昨日はひまわり園で買い物に行きました！とても暑かったですが…', author:'佐藤' },
   { id:'r2', date:'2025/09/06(土)', excerpt:'昨日はひまわり園で買い物に行きました！とても暑かったですが…', author:'佐藤' },
   { id:'r3', date:'2025/09/06(土)', excerpt:'昨日はひまわり園で買い物に行きました！とても暑かったですが…', author:'佐藤' },
@@ -66,8 +66,8 @@ export default function DashboardHome() {
                   <div className="opacity-60">
                     {k.key === 'views' && <BarChart3 size={18} />}
                     {k.key === 'applies' && <Users size={18} />}
-                    {k.key === 'ricologPosts' && <MessageSquare size={18} />}
-                    {k.key === 'ricologPublishes' && <FileText size={18} />}
+                    {k.key === 'LicologPosts' && <MessageSquare size={18} />}
+                    {k.key === 'LicologPublishes' && <FileText size={18} />}
                   </div>
                 </div>
                 <div className="mt-1 text-3xl font-semibold tracking-tight">{k.value.toLocaleString()}</div>
@@ -112,7 +112,7 @@ export default function DashboardHome() {
               <a href="#" className="text-sm text-[#3a3732]/70 hover:text-[#3a3732]">リコログ一覧はこちら</a>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {ricologs.map((r) => (
+              {Licologs.map((r) => (
                 <div key={r.id} className="rounded-2xl border border-black/5 p-3 bg-white">
                   <div className="h-28 w-full rounded-xl bg-black/5 grid place-items-center text-sm text-[#3a3732]/60">NO IMAGE</div>
                   <div className="mt-2 text-xs opacity-70">{r.date}</div>
