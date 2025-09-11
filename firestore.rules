@@ -27,9 +27,14 @@ service cloud.firestore {
 
       // 承認イベントの記録
       match /events/{eventId} {
-        allow create: if signedIn()
-          && request.resource.data.orgId == orgId;
-        allow read, update, delete: if false;
+       // 作成（既存のまま）
+       allow create: if signedIn()
+         && request.resource.data.orgId == orgId;
+       // ✅ 読み取りを許可（将来はロールで絞る）
+       allow read: if signedIn()
+         && resource.data.orgId == orgId;
+       // 更新/削除は不可
+       allow update, delete: if false;
       }
     }
   }

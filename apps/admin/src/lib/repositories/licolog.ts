@@ -8,6 +8,7 @@ import {
   writeBatch,
   doc,
   serverTimestamp,
+  limit as qLimit,         // ★ 追加
 } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 
@@ -21,9 +22,19 @@ export type AdminLicologPost = {
   updatedAt?: any;
 };
 
+// ★ 承認イベントの型を追加
+export type LicologApprovalEvent = {
+  id: string;
+  type: "licolog_approved";
+  postId: string;
+  orgId: string;
+  approvedBy: string;
+  createdAt?: any;
+};
+
 const ORG_ID = "demo-org";
 
-// 「承認待ち」を購読（ウォール表示用）
+// --- 既存: 承認待ち購読 ---
 export function subscribePendingLicologPosts(
   cb: (posts: AdminLicologPost[]) => void
 ): () => void {
@@ -42,7 +53,7 @@ export function subscribePendingLicologPosts(
   });
 }
 
-// 複数投稿をまとめて「公開(approved)」にする + 承認イベントを記録
+// --- 既存: 複数承認＋イベント書き込み ---
 export async function bulkApproveLicologPosts(ids: string[]): Promise<void> {
   if (ids.length === 0) return;
   const user = auth.currentUser;
@@ -52,11 +63,9 @@ export async function bulkApproveLicologPosts(ids: string[]): Promise<void> {
   const now = serverTimestamp();
 
   ids.forEach((id) => {
-    // 1) 投稿の status を approved に
     const postRef = doc(db, `organizations/${ORG_ID}/licologPosts/${id}`);
     batch.update(postRef, { status: "approved", updatedAt: now });
 
-    // 2) 承認イベントを記録
     const eventRef = doc(collection(db, `organizations/${ORG_ID}/events`));
     batch.set(eventRef, {
       type: "licolog_approved",
@@ -64,8 +73,29 @@ export async function bulkApproveLicologPosts(ids: string[]): Promise<void> {
       orgId: ORG_ID,
       approvedBy: user.uid,
       createdAt: now,
-    });
+    } satisfies Omit<LicologApprovalEvent, "id">);
   });
 
   await batch.commit();
+}
+
+// ★ 新規: 承認履歴（events）購読
+export function subscribeLicologApprovalEvents(
+  cb: (events: LicologApprovalEvent[]) => void,
+  options?: { limit?: number }
+): () => void {
+  const col = collection(db, `organizations/${ORG_ID}/events`);
+  const q = query(
+    col,
+    where("orgId", "==", ORG_ID),
+    where("type", "==", "licolog_approved"),
+    orderBy("createdAt", "desc"),
+    ...(options?.limit ? [qLimit(options.limit)] : [])
+  );
+  return onSnapshot(q, (snap) => {
+    const items = snap.docs.map(
+      (d) => ({ id: d.id, ...(d.data() as Omit<LicologApprovalEvent, "id">) })
+    );
+    cb(items);
+  });
 }
