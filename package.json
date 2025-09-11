@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "emu": "firebase emulators:start --only firestore,auth",
+    "emu": "firebase emulators:start --only firestore,auth,storage",
     "test:rules": "firebase emulators:exec --only firestore \"vitest run src/rules.test.ts\"",
     "test:rules:live": "FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 vitest run src/rules.test.ts",
     "test:rules:watch": "FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 vitest watch src/rules.test.ts",

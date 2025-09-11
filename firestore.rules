@@ -1,40 +1,49 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
     function signedIn() { return request.auth != null; }
 
+    // --- ルート直下の jobs（任意：古いテストやツール用） ---
+    match /jobs/{jobId} {
+      allow create, read: if signedIn();
+      allow update, delete: if false;
+    }
+
+    // --- 組織配下 ---
     match /organizations/{orgId} {
+
+      // ★ これを追加：組織配下の jobs
+      match /jobs/{jobId} {
+        // orgId フィールドの整合を必須にして作成を許可
+        allow create: if signedIn() && request.resource.data.orgId == orgId;
+        // 読み取りは社内だけOK（必要に応じて絞ってください）
+        allow read: if signedIn();
+        allow update, delete: if false;
+      }
+
       // リコログ
       match /licologPosts/{postId} {
-        // 作成: 認証済み + pending + orgId一致
         allow create: if signedIn()
           && request.resource.data.status == 'pending'
           && request.resource.data.orgId == orgId;
 
-        // 読み取り（list/get）
         allow read: if signedIn();
 
-        // 承認: pending → approved のみ許可（orgId は変えられない）
         allow update: if signedIn()
           && resource.data.orgId == orgId
           && request.resource.data.orgId == orgId
           && resource.data.status == 'pending'
           && request.resource.data.status == 'approved';
 
-        // 削除はNG
         allow delete: if false;
       }
 
-      // 承認イベントの記録
+      // 承認イベント（履歴）
       match /events/{eventId} {
-       // 作成（既存のまま）
-       allow create: if signedIn()
-         && request.resource.data.orgId == orgId;
-       // ✅ 読み取りを許可（将来はロールで絞る）
-       allow read: if signedIn()
-         && resource.data.orgId == orgId;
-       // 更新/削除は不可
-       allow update, delete: if false;
+        allow read: if signedIn();
+        allow create: if signedIn() && request.resource.data.orgId == orgId;
+        allow update, delete: if false;
       }
     }
   }
