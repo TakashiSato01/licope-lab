@@ -13,7 +13,14 @@
     "build": "vite build",
     "deploy:dev": "vite build && firebase deploy --only hosting --project default",
     "deploy:prod": "vite build && firebase deploy --only hosting --project prod",
-    "check": "npm run typecheck && npm run test:rules"
+    "check": "npm run typecheck && npm run test:rules",
+    "dev:all": "concurrently -n admin,licolog -c magenta,cyan \"npm:dev:admin\" \"npm:dev:licolog\"",
+    "dev:admin": "vite --config apps/admin/vite.config.ts --port 5173",
+    "dev:licolog": "vite --config apps/licolog/vite.config.ts --port 5174",
+    "build:admin": "vite build --config apps/admin/vite.config.ts",
+    "build:licolog": "vite build --config apps/licolog/vite.config.ts",
+    "preview:admin": "vite preview --config apps/admin/vite.config.ts --port 4173",
+    "preview:licolog": "vite preview --config apps/licolog/vite.config.ts --port 4174"
   },
   "dependencies": {
     "firebase": "^12.2.1",
