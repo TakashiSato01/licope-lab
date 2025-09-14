@@ -77,9 +77,7 @@ export default function Dashboard() {
                 >
                   <FileText size={16} /> {!collapsed && <span>求人ページを作成する</span>}
                 </NavLink>
-                <button className={cn("w-full inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-medium text-[#3a3732] hover:bg-black/5", collapsed && "justify-center px-2")}>
-                  <Users size={16} /> {!collapsed && <span>応募管理</span>}
-                </button>
+                <NavItem to="/applications" collapsed={collapsed} icon={Users} label="応募管理" />
               </div>
             </div>
 

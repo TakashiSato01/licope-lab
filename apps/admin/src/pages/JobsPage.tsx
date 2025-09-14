@@ -1,4 +1,3 @@
-// apps/admin/src/pages/JobsPage.tsx
 import React, { useEffect, useState } from "react";
 import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -58,9 +57,12 @@ export default function JobsPage() {
       ) : (
         <ul className="space-y-2">
           {items.map((j) => {
-            const publicPath = `/p/${ORG_ID}/jobs/${j.id}`;
+            const publicPath = `/p/${j.orgId ?? ORG_ID}/jobs/${j.id}`;
             return (
-              <li key={j.id} className="rounded-xl bg-white border border-black/5 p-3 flex items-center justify-between">
+              <li
+                key={j.id}
+                className="rounded-xl bg-white border border-black/5 p-3 flex items-center justify-between"
+              >
                 <div className="font-medium">{j.title || "(無題)"}</div>
                 <div className="flex items-center gap-2">
                   <button
@@ -70,15 +72,15 @@ export default function JobsPage() {
                   >
                     開く
                   </button>
-                  <a
+                  <Link
                     className="px-3 py-1 rounded-lg border hover:bg-black/5"
-                    href={publicPath}
+                    to={publicPath}
                     target="_blank"
-                    rel="noopener"
+                    rel="noreferrer"
                     title="新しいタブで開く"
                   >
                     新しいタブで開く
-                  </a>
+                  </Link>
                 </div>
               </li>
             );

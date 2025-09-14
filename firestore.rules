@@ -3,49 +3,46 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     function signedIn() { return request.auth != null; }
+    function isString(x) { return x is string && x.size() <= 5000; }
 
-    // --- ルート直下の jobs（任意：古いテストやツール用） ---
-    match /jobs/{jobId} {
-      allow create, read: if signedIn();
-      allow update, delete: if false;
-    }
-
-    // --- 組織配下 ---
     match /organizations/{orgId} {
 
-    // 公開済み求人のメタ（誰でも読める）
-    match /publicJobs/{pubId} {
-      // 公開は誰でも見られる
-      allow read: if true;
-      // 作成/更新はログイン済み & orgId一致
-      allow create, update: if signedIn() && request.resource.data.orgId == orgId;
-      allow delete: if false;
-    }
-
-      // 求人（下書き）
+      // --- 求人（下書き等：管理画面用） ---
       match /jobs/{jobId} {
-        allow create: if signedIn() && request.resource.data.orgId == orgId;
+        // 読み取りは管理画面ユーザーのみ
         allow read: if signedIn();
+
+        // 作成・更新・削除は、組織一致 & ログイン済み
+        allow create, update, delete: if signedIn()
+          && request.resource.data.orgId == orgId;
+      }
+
+      // --- 公開求人のメタ情報（誰でも読める） ---
+      match /publicJobs/{pubId} {
+        // 公開ページから誰でも読める
+        allow read: if true;
+
+        // 発行時のみ管理画面から作成可（更新/削除は不可）
+        allow create: if signedIn()
+          && request.resource.data.orgId == orgId
+          && isString(request.resource.data.title)
+          && request.resource.data.storagePath is string
+          && request.resource.data.publishedAt is timestamp
+          && isString(request.resource.data.publishedBy);
         allow update, delete: if false;
       }
 
-      // ★ これを追加：組織配下の jobs
-      match /jobs/{jobId} {
-        // orgId フィールドの整合を必須にして作成を許可
-        allow create: if signedIn() && request.resource.data.orgId == orgId;
-        // 読み取りは社内だけOK（必要に応じて絞ってください）
-        allow read: if signedIn();
-        allow update, delete: if false;
-      }
-
-      // リコログ
+      // --- リコログ ---
       match /licologPosts/{postId} {
+        // 作成：認証済み + pending + orgId 一致
         allow create: if signedIn()
           && request.resource.data.status == 'pending'
           && request.resource.data.orgId == orgId;
 
+        // 読み取り：管理画面ユーザー
         allow read: if signedIn();
 
+        // 承認：pending → approved のみ
         allow update: if signedIn()
           && resource.data.orgId == orgId
           && request.resource.data.orgId == orgId
@@ -55,16 +52,28 @@ service cloud.firestore {
         allow delete: if false;
       }
 
-      // ★ 公開済み求人のメタ
-      match /publicJobs/{pubId} {
-        allow read: if true; // 公開読み取り
-        allow create, update, delete: if signedIn() && request.resource.data.orgId == orgId;
+      // --- 監査イベント（作成のみ可） ---
+      match /events/{eventId} {
+        allow create: if signedIn()
+          && request.resource.data.orgId == orgId;
+        allow read, update, delete: if false;
       }
 
-      // 承認イベント（履歴）
-      match /events/{eventId} {
+      // --- 応募（公開フォームから誰でも作成可。閲覧は管理のみ） ---
+      match /applications/{appId} {
+        // 作成：未ログインでも可。ただしバリデーションはしっかり
+        allow create: if
+          request.resource.data.orgId == orgId
+          && request.resource.data.jobPubId is string
+          && isString(request.resource.data.name)
+          && isString(request.resource.data.contact)
+          && (request.resource.data.message is string || request.resource.data.message == null)
+          && request.resource.data.createdAt is timestamp;
+
+        // 管理画面からのみ参照
         allow read: if signedIn();
-        allow create: if signedIn() && request.resource.data.orgId == orgId;
+
+        // 更新/削除は不可（必要になったら要件に応じて追加）
         allow update, delete: if false;
       }
     }

@@ -1,26 +1,21 @@
 import React from "react";
+import type { JobDraft } from "./JobForm";
 
-type Props = {
-  title: string;
-  wage: string;
-  description: string;
-};
-
-export default function JobPreview({ title, wage, description }: Props) {
-  const safeTitle = title?.trim() || "（タイトル未入力）";
-  const safeWage = wage?.trim() || "（給与未入力）";
-  const safeDesc = description?.trim() || "（仕事内容が未入力です）";
-
+export default function JobPreview({ form }: { form: JobDraft }) {
+  const f = form ?? { title: "", wage: "", description: "" };
   return (
-    <article className="prose max-w-none">
-      <h2 className="text-lg font-semibold">{safeTitle}</h2>
-      <p className="text-[#3a3732]">
-        <span className="inline-block text-xs px-2 py-1 rounded-full bg-[#faf1f4] mr-2">給与</span>
-        {safeWage}
-      </p>
-      <hr className="my-4" />
-      <h3 className="font-semibold mb-1">仕事内容</h3>
-      <p className="whitespace-pre-wrap leading-relaxed">{safeDesc}</p>
-    </article>
+    <div>
+      <div className="text-sm text-gray-500 mb-2">（プレビュー）</div>
+      <h3 className="text-xl font-bold mb-2">
+        {f.title || "（タイトル未入力）"}
+      </h3>
+      <div className="mb-2">
+        <span className="text-sm font-medium">給与：</span>
+        <span>{f.wage || "（給与未入力）"}</span>
+      </div>
+      <div className="text-sm whitespace-pre-wrap">
+        {f.description || "（仕事内容の説明がここに表示されます）"}
+      </div>
+    </div>
   );
 }

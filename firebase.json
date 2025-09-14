@@ -11,5 +11,13 @@
     "auth": { "host": "127.0.0.1", "port": 9099 },
     "firestore": { "host": "127.0.0.1", "port": 8080 },
     "storage": { "host": "127.0.0.1", "port": 9199 }
+  },
+  "functions": { "source": "functions" },
+  "emulators": {
+    "ui": { "enabled": true, "host": "127.0.0.1", "port": 4000 },
+    "auth": { "host": "127.0.0.1", "port": 9099 },
+    "firestore": { "host": "127.0.0.1", "port": 8080, "rules": "firestore.rules" },
+    "storage": { "host": "127.0.0.1", "port": 9199, "rules": "storage.rules" },
+    "functions": { "host": "127.0.0.1", "port": 5001 }
   }
 }
