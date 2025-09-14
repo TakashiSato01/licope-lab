@@ -24,12 +24,18 @@ describe("Firestore Security Rules", () => {
         await assertFails(anonDb.collection("jobs").add({ title: "B" }));
     });
 
-// apps/admin/src/rules.test.ts
+// apps/admin/src/rules.test.ts の「認証されたユーザーは、jobsコレクションに書き込める」
 test("認証されたユーザーは、jobsコレクションに書き込める", async () => {
   const authedDb = testEnv.authenticatedContext("user_abc").firestore();
   const orgId = "demo-org";
   await assertSucceeds(
-    authedDb.collection(`organizations/${orgId}/jobs`).add({ title: "A", wage: 1000, orgId })
+    authedDb.collection(`organizations/${orgId}/jobs`).add({
+      orgId,
+      status: "draft",      // ルールが要求
+      title: "A",           // 簡単な文字列でOK
+      wage: "1000"          // 文字列 or number どちらでも可（ルール側が許容）
+      // createdAt は付けない（undefined を送るとクライアント側で弾かれる）
+    })
   );
 });
     

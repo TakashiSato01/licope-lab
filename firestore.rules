@@ -2,84 +2,87 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // 共通ヘルパ
     function signedIn() { return request.auth != null; }
     function isString(x) { return x is string && x.size() <= 5000; }
 
     match /organizations/{orgId} {
 
-      // --- 求人（下書き等：管理画面用） ---
+      // ---------- 求人（下書き） ----------
+      // 管理画面から作成するドラフト。読み取りは管理ユーザーのみ。
       match /jobs/{jobId} {
-        // 読み取りは管理画面ユーザーのみ
-        allow read: if signedIn();
-
-        // 作成・更新・削除は、組織一致 & ログイン済み
-        allow create, update, delete: if signedIn()
-          && request.resource.data.orgId == orgId;
-      }
-
-      // --- 公開求人のメタ情報（誰でも読める） ---
-      match /publicJobs/{pubId} {
-        // 公開ページから誰でも読める
-        allow read: if true;
-
-        // 発行時のみ管理画面から作成可（更新/削除は不可）
+        allow read, list: if signedIn();
         allow create: if signedIn()
           && request.resource.data.orgId == orgId
+          && request.resource.data.status == 'draft'
           && isString(request.resource.data.title)
-          && request.resource.data.storagePath is string
-          && request.resource.data.publishedAt is timestamp
-          && isString(request.resource.data.publishedBy);
+          && (request.resource.data.wage is number
+              || isString(request.resource.data.wage));
+        // 更新/削除は一旦閉じる（必要になったら条件付きで開ける）
         allow update, delete: if false;
       }
 
-      // --- リコログ ---
+      // ---------- 公開求人メタ ----------
+      // 公開側/管理側どちらでも閲覧できる
+      match /publicJobs/{pubId} {
+        allow read, list: if true;
+        // 管理画面からの「発行（スナップショット作成済み）」のみ許可
+        allow create: if signedIn()
+          && request.resource.data.orgId == orgId
+          && isString(request.resource.data.title)
+          && isString(request.resource.data.storagePath)
+          && isString(request.resource.data.publishedBy)
+          && request.resource.data.publishedAt is timestamp;
+        allow update, delete: if false;
+      }
+
+      // ---------- リコログ ----------
       match /licologPosts/{postId} {
         // 作成：認証済み + pending + orgId 一致
         allow create: if signedIn()
-          && request.resource.data.status == 'pending'
-          && request.resource.data.orgId == orgId;
+          && request.resource.data.orgId == orgId
+          && request.resource.data.status == 'pending';
 
-        // 読み取り：管理画面ユーザー
-        allow read: if signedIn();
+        // 一覧/詳細：管理ユーザー
+        allow read, list: if signedIn();
 
-        // 承認：pending → approved のみ
+        // 承認：pending → approved | hidden のみ
         allow update: if signedIn()
           && resource.data.orgId == orgId
-          && request.resource.data.orgId == orgId
           && resource.data.status == 'pending'
-          && request.resource.data.status == 'approved';
+          && request.resource.data.status in ['approved', 'hidden'];
 
         allow delete: if false;
       }
 
-      // --- 監査イベント（作成のみ可） ---
+      // ---------- 承認イベント履歴 ----------
       match /events/{eventId} {
-        allow create: if signedIn()
-          && request.resource.data.orgId == orgId;
-        allow read, update, delete: if false;
-      }
-
-      // --- 応募（公開フォームから誰でも作成可。閲覧は管理のみ） ---
-      match /applications/{appId} {
-        // 作成：未ログインでも可。ただしバリデーションはしっかり
-        allow create: if
-          request.resource.data.orgId == orgId
-          && request.resource.data.jobPubId is string
-          && isString(request.resource.data.name)
-          && isString(request.resource.data.contact)
-          && (request.resource.data.message is string || request.resource.data.message == null)
-          && request.resource.data.createdAt is timestamp;
-
-        // 管理画面からのみ参照
-        allow read: if signedIn();
-
-        // 更新/削除は不可（必要になったら要件に応じて追加）
+        allow read, list: if signedIn();
+        allow create: if signedIn() && request.resource.data.orgId == orgId;
         allow update, delete: if false;
       }
 
+      // ---------- 応募 ----------
+      match /applications/{appId} {
+        // 公開ページからの応募（未認証OK）
+        allow create: if request.resource.data.orgId == orgId
+          && isString(request.resource.data.jobPubId)
+          && isString(request.resource.data.name)
+          && isString(request.resource.data.contact)
+          && (!('message' in request.resource.data)
+              || isString(request.resource.data.message))
+          // createdAt は送っても送らなくてもOK（送るなら timestamp）
+          && (!('createdAt' in request.resource.data)
+              || request.resource.data.createdAt is timestamp);
+        // 一覧は管理画面のみ
+        allow read, list: if signedIn();
+        allow update, delete: if false;
+      }
+
+      // ---------- ダッシュボード用メトリクス ----------
       match /metrics/{document=**} {
-        allow read: if true;     // ダッシュボードで参照
-        allow write: if false;   // 書き込みは Functions（管理SDK）からのみ
+        allow read, list: if signedIn();
+        allow write: if false; // 集計は Functions(admin SDK) 側で書く
       }
     }
   }
