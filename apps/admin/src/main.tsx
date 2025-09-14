@@ -4,13 +4,19 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import "./index.css";
 
-// Firebase（エミュ）初期化と匿名ログイン
+// Firebase エミュ接続 & 匿名ログイン完了まで待つ
 import { ensureSignedIn } from "./lib/firebase";
 
-// 画面
+// レイアウト & ページ
 import Dashboard from "./pages/Dashboard";
 import DashboardHome from "./pages/DashboardHome";
-import JobsPage from "./pages/JobsPage";
+
+// ★一覧ページ（既存の JobsPage.tsx をこの役にしてOK）
+import JobsIndexPage from "./pages/JobsPage";
+
+// ★新規作成ページ（このファイルを追加します）
+import JobCreatePage from "./pages/jobs/JobCreatePage";
+
 import LicologPage from "./pages/LicologPage";
 import LpBuilderPage from "./pages/LpBuilderPage";
 
@@ -18,31 +24,34 @@ function App() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    // Auth エミュ + 匿名ログインが完了するまで待つ
     ensureSignedIn().finally(() => setReady(true));
   }, []);
 
   if (!ready) {
-    // ここでは Router をまだ作らない（NavLink/useLocation を発火させない）
-    return (
-      <div style={{ padding: 24 }}>
-        Connecting to Auth/Firestore emulator…
-      </div>
-    );
+    // Router を作らず、フック実行を避ける
+    return <div style={{ padding: 24 }}>Connecting to Auth/Firestore emulator…</div>;
   }
 
   return (
     <BrowserRouter>
       <Routes>
-        {/* サイドバーなどを含むレイアウト */}
+        {/* サイドバー付きのレイアウト */}
         <Route element={<Dashboard />}>
+          {/* ホーム */}
           <Route index element={<DashboardHome />} />
-          <Route path="jobs" element={<JobsPage />} />
+
+          {/* 求人：一覧 → /jobs、新規作成 → /jobs/new */}
+          <Route path="jobs">
+            <Route index element={<JobsIndexPage />} />
+            <Route path="new" element={<JobCreatePage />} />
+          </Route>
+
+          {/* リコログ・LPビルダー */}
           <Route path="licolog" element={<LicologPage />} />
           <Route path="lp" element={<LpBuilderPage />} />
         </Route>
 
-        {/* どのルートにも当たらなければホームへ */}
+        {/* フォールバック */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
