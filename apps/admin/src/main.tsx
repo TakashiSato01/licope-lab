@@ -4,54 +4,45 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import "./index.css";
 
-// Firebase エミュ接続 & 匿名ログイン完了まで待つ
 import { ensureSignedIn } from "./lib/firebase";
 
-// レイアウト & ページ
+// 画面
 import Dashboard from "./pages/Dashboard";
 import DashboardHome from "./pages/DashboardHome";
-
-// ★一覧ページ（既存の JobsPage.tsx をこの役にしてOK）
-import JobsIndexPage from "./pages/JobsPage";
-
-// ★新規作成ページ（このファイルを追加します）
+import JobsPage from "./pages/JobsPage";
 import JobCreatePage from "./pages/jobs/JobCreatePage";
-
 import LicologPage from "./pages/LicologPage";
-import LpBuilderPage from "./pages/LpBuilderPage";
+import PublicJobPage from "./pages/jobs/PublicJobPage";
 
 function App() {
   const [ready, setReady] = useState(false);
-
   useEffect(() => {
     ensureSignedIn().finally(() => setReady(true));
   }, []);
 
   if (!ready) {
-    // Router を作らず、フック実行を避ける
-    return <div style={{ padding: 24 }}>Connecting to Auth/Firestore emulator…</div>;
+    return (
+      <div style={{ padding: 24 }}>
+        Connecting to Auth/Firestore emulator…
+      </div>
+    );
   }
 
   return (
     <BrowserRouter>
       <Routes>
-        {/* サイドバー付きのレイアウト */}
+        {/* 管理画面レイアウト配下 */}
         <Route element={<Dashboard />}>
-          {/* ホーム */}
           <Route index element={<DashboardHome />} />
-
-          {/* 求人：一覧 → /jobs、新規作成 → /jobs/new */}
-          <Route path="jobs">
-            <Route index element={<JobsIndexPage />} />
-            <Route path="new" element={<JobCreatePage />} />
-          </Route>
-
-          {/* リコログ・LPビルダー */}
+          <Route path="jobs" element={<JobsPage />} />
+          <Route path="jobs/new" element={<JobCreatePage />} />
           <Route path="licolog" element={<LicologPage />} />
-          <Route path="lp" element={<LpBuilderPage />} />
         </Route>
 
-        {/* フォールバック */}
+        {/* 公開ページ（ダッシュボード外） */}
+        <Route path="/p/:orgId/jobs/:pubId" element={<PublicJobPage />} />
+
+        {/* fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

@@ -1,60 +1,41 @@
-import { useState } from "react";
-import JobForm from "./JobForm";           // ← あなたのファイル名に合わせて
-import JobPreview from "./JobPreview";     // ← 同上
-import { saveJobDraft } from "@/lib/repositories/jobs";
-
-export type JobDraft = {
-  title: string;
-  wage: string;
-  description: string;
-};
+// apps/admin/src/pages/jobs/JobCreatePage.tsx
+import React, { useState } from "react";
+import JobForm, { JobFormValue } from "./JobForm";
+import JobPreview from "./JobPreview";
+import { publishJob } from "@/lib/repositories/jobs";
+import { useNavigate } from "react-router-dom";
 
 export default function JobCreatePage() {
-  const [form, setForm] = useState<JobDraft>({
+  const [form, setForm] = useState<JobFormValue>({
     title: "",
     wage: "",
     description: "",
   });
-  const [saving, setSaving] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const navigate = useNavigate();
 
-  const handleChange = (patch: Partial<JobDraft>) =>
-    setForm((prev) => ({ ...prev, ...patch }));
-
-  const canSave = form.title.trim() !== "" && form.wage.trim() !== "";
-
-  const onSave = async () => {
-    if (!canSave || saving) return;
-    setSaving(true);
+  const onPublish = async () => {
+    if (publishing) return;
+    setPublishing(true);
     try {
-      const id = await saveJobDraft(form);
-      alert(`下書きを保存しました（id: ${id}）`);
-      // 必要なら /jobs へ遷移:
-      // navigate("/jobs");
+      const { publicPath } = await publishJob(form);
+      // 成功 → 一覧へ戻す & 新しいタブで公開URLを開く
+      window.open(publicPath, "_blank", "noopener");
+      navigate("/jobs", { replace: true });
     } catch (e: any) {
-      alert(`保存に失敗しました: ${e?.message ?? e}`);
+      alert(`公開に失敗しました: ${e?.message ?? e}`);
     } finally {
-      setSaving(false);
+      setPublishing(false);
     }
   };
 
   return (
-    <div className="grid gap-6 p-6"
-         style={{ gridTemplateColumns: "minmax(560px, 720px) 1fr" }}>
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold">求人ページを作成</h2>
-        <JobForm
-          form={form}
-          onChange={handleChange}
-          onSave={onSave}
-          canSave={canSave}
-          saving={saving}
-        />
-      </section>
-
-      <aside className="bg-white rounded-xl shadow-sm border sticky top-6 h-fit p-4">
-        <h3 className="text-sm font-semibold mb-3 text-gray-600">プレビュー</h3>
-        <JobPreview form={form} />
-      </aside>
+    <div className="p-6">
+      <h2 className="text-lg font-semibold mb-4">求人ページを作成</h2>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <JobForm value={form} onChange={setForm} onPublish={onPublish} publishing={publishing} />
+        <JobPreview value={form} />
+      </div>
     </div>
   );
 }

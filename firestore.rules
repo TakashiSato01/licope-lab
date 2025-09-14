@@ -13,13 +13,19 @@ service cloud.firestore {
     // --- 組織配下 ---
     match /organizations/{orgId} {
 
+    // 公開済み求人のメタ（誰でも読める）
+    match /publicJobs/{pubId} {
+      // 公開は誰でも見られる
+      allow read: if true;
+      // 作成/更新はログイン済み & orgId一致
+      allow create, update: if signedIn() && request.resource.data.orgId == orgId;
+      allow delete: if false;
+    }
+
       // 求人（下書き）
       match /jobs/{jobId} {
-        // まずは認証済み & orgId 整合のみ許可（下書き作成）
         allow create: if signedIn() && request.resource.data.orgId == orgId;
-        // 一覧/詳細の参照（社内用なので認証必須）
         allow read: if signedIn();
-        // 更新/削除は後で段階的に開ける
         allow update, delete: if false;
       }
 
@@ -47,6 +53,12 @@ service cloud.firestore {
           && request.resource.data.status == 'approved';
 
         allow delete: if false;
+      }
+
+      // ★ 公開済み求人のメタ
+      match /publicJobs/{pubId} {
+        allow read: if true; // 公開読み取り
+        allow create, update, delete: if signedIn() && request.resource.data.orgId == orgId;
       }
 
       // 承認イベント（履歴）

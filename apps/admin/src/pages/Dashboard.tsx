@@ -41,14 +41,14 @@ export default function Dashboard() {
               <button
                 aria-label="ユーザーメニュー"
                 onClick={() => setMenuOpen((v) => !v)}
-                className="p-2 rounded-full hover:bg-white/15 text-white flex items-center"
+                className="p-2 rounded-full hover:bg白/15 text-white flex items-center"
               >
                 <MenuIcon size={18} />
               </button>
               {menuOpen && (
                 <div className="absolute right-0 mt-2 w-40 rounded-xl bg-white shadow-lg text-sm text-[#3a3732]">
                   <button className="w-full text-left px-3 py-2 hover:bg-black/5">ユーザー設定</button>
-                  <button className="w-full text-left px-3 py-2 hover:bg黒/5">ログアウト</button>
+                  <button className="w-full text-left px-3 py-2 hover:bgブラック/5">ログアウト</button>
                 </div>
               )}
             </div>
@@ -65,33 +65,21 @@ export default function Dashboard() {
             <div className="flex-1">
               <NavItem to="/" collapsed={collapsed} icon={LayoutDashboard} label="ダッシュボード" end />
               <NavItem to="/jobs" collapsed={collapsed} icon={FileText} label="求人ページ" />
-              {/* ↓ 小文字に修正 */}
               <NavItem to="/licolog" collapsed={collapsed} icon={MessageSquare} label="リコログ" />
               <NavItem to="/works" collapsed={collapsed} icon={Briefcase} label="リコペワークス" />
               <NavItem to="/analytics" collapsed={collapsed} icon={BarChart3} label="詳細分析" />
 
               <div className="mt-4 space-y-2">
-                {/* ↓ /jobs/new に遷移（見た目そのまま） */}
+                {/* 作成ボタンは NavLink（見た目は今のまま） */}
                 <NavLink
                   to="/jobs/new"
-                  className={cn(
-                    "w-full inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-medium bg-[#f579a4] text-white hover:opacity-90",
-                    collapsed && "justify-center px-2"
-                  )}
+                  className={cn("w-full inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-medium bg-[#f579a4] text-white hover:opacity-90", collapsed && "justify-center px-2")}
                 >
                   <FileText size={16} /> {!collapsed && <span>求人ページを作成する</span>}
                 </NavLink>
-
-                {/* 遷移先は後で決める場合は # でもOK。用意済なら /jobs/applications 等に */}
-                <NavLink
-                  to="/applications"
-                  className={cn(
-                    "w-full inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-medium text-[#3a3732] hover:bg-black/5",
-                    collapsed && "justify-center px-2"
-                  )}
-                >
+                <button className={cn("w-full inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-medium text-[#3a3732] hover:bg-black/5", collapsed && "justify-center px-2")}>
                   <Users size={16} /> {!collapsed && <span>応募管理</span>}
-                </NavLink>
+                </button>
               </div>
             </div>
 
@@ -118,9 +106,7 @@ export default function Dashboard() {
   );
 }
 
-function NavItem({
-  to, icon: Icon, label, collapsed, end = false,
-}:{
+function NavItem({ to, icon: Icon, label, collapsed, end=false }:{
   to: string; icon: any; label: string; collapsed: boolean; end?: boolean;
 }) {
   return (
@@ -132,7 +118,7 @@ function NavItem({
         cn(
           "group flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-black/5 transition-colors",
           collapsed && "justify-center",
-          // 指示どおりアクティブ色は付けない（付けたくなったら isActive で装飾）
+          // アクティブ時の色変化は不要とのことなので装飾は付けない
           ""
         )
       }
