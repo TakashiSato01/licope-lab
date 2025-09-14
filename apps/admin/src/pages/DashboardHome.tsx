@@ -1,137 +1,476 @@
-import React, { useMemo } from "react";
-import { BarChart3, Users, MessageSquare, FileText, ChevronDown, AlertCircle } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  collection,
+  onSnapshot,
+  orderBy,
+  query,
+  where,
+  limit,
+  Timestamp,
+} from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { Link, useNavigate } from "react-router-dom";
+import {
+  ResponsiveContainer,
+  ComposedChart,
+  Line,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Legend,
+  CartesianGrid,
+} from "recharts";
 
-function cn(...a: Array<string | false | null | undefined>) { return a.filter(Boolean).join(" "); }
-const Card: React.FC<React.PropsWithChildren<{ className?: string }>> = ({ className, children }) => (
-  <div className={cn("bg-white rounded-2xl shadow-sm", className)}>{children}</div>
-);
-const CardBody: React.FC<React.PropsWithChildren<{ className?: string }>> = ({ className, children }) => (
-  <div className={cn("p-5", className)}>{children}</div>
-);
-const Badge: React.FC<React.PropsWithChildren<{ intent?: "pink" | "gray"; className?: string }>> = ({ intent = "gray", className, children }) => (
-  <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap",
-    intent === "pink" ? "bg-[#fce3eb] text-[#3a3732]" : "bg-[#f1f1f1] text-[#3a3732]", className)}>{children}</span>
-);
+const ORG_ID = "demo-org";
 
-function Sparkline({ series }: { series: number[] }) {
-  const path = useMemo(() => {
-    if (!series?.length) return "";
-    const w = 160, h = 48, min = Math.min(...series), max = Math.max(...series), range = max - min || 1;
-    const pts = series.map((v, i) => `${(i/(series.length-1))*w},${h-((v-min)/range)*h}`);
-    return `M ${pts[0]} L ${pts.slice(1).join(" ")}`;
-  }, [series]);
-  return <svg viewBox="0 0 160 48" className="w-full h-12"><path d={path} fill="none" stroke="#f579a4" strokeWidth={2} /></svg>;
+/* ---------- 小ユーティリティ ---------- */
+function startOfDay(d = new Date()) {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+function addDays(d: Date, delta: number) {
+  const x = new Date(d);
+  x.setDate(x.getDate() + delta);
+  return x;
+}
+function fmtMMDD(d: Date) {
+  const m = `${d.getMonth() + 1}`.padStart(2, "0");
+  const day = `${d.getDate()}`.padStart(2, "0");
+  return `${m}/${day}`;
+}
+function pctDelta(curr: number, prev: number) {
+  if (prev <= 0) return curr > 0 ? 100 : 0;
+  return Math.round(((curr - prev) / prev) * 100);
+}
+function deltaColor(p: number) {
+  return p >= 0 ? "text-sky-600" : "text-[#f579a4]";
 }
 
-type Kpi = { key:'views'|'applies'|'LicologPosts'|'LicologPublishes'; label:string; value:number; diff:number; series:number[] };
-type JobItem = { id:string; title:string; status:'公開中'|'下書き'; thumbnail?:string };
-type LicologItem = { id:string; date:string; excerpt:string; author:string; thumbnail?:string };
+/* ---------- 型 ---------- */
+type PublicJob = {
+  id: string;
+  title: string;
+  publishedAt?: any;
+};
 
-const kpis: Kpi[] = [
-  { key:'views', label:'求人ページ閲覧数', value:1088, diff:+110, series:[12,18,11,25,19,30,28,40,35,45,42,55] },
-  { key:'applies', label:'応募数', value:5, diff:-80, series:[8,7,6,5,4,6,4,3,2,4,3,2] },
-  { key:'LicologPosts', label:'リコログ投稿数', value:33, diff:+125, series:[2,3,2,4,5,4,6,7,6,8,7,9] },
-  { key:'LicologPublishes', label:'リコログ公開数', value:21, diff:+200, series:[1,1,1,2,2,3,3,4,4,5,5,6] },
-];
+type LicologPost = {
+  id: string;
+  body: string;
+  status: "pending" | "approved" | "hidden" | "internal";
+  facilityId?: string;
+  createdAt?: any;
+};
 
-const jobs: JobItem[] = [
-  { id:'j1', title:'介護職正社員の募集【盛岡市本宮】※デイサービス', status:'公開中' },
-  { id:'j2', title:'介護職正社員の募集【盛岡市本宮】※デイサービス', status:'下書き' },
-  { id:'j3', title:'介護職正社員の募集【盛岡市本宮】※デイサービス', status:'下書き' },
-];
-
-const Licologs: LicologItem[] = [
-  { id:'r1', date:'2025/09/06(土)', excerpt:'昨日はひまわり園で買い物に行きました！とても暑かったですが…', author:'佐藤' },
-  { id:'r2', date:'2025/09/06(土)', excerpt:'昨日はひまわり園で買い物に行きました！とても暑かったですが…', author:'佐藤' },
-  { id:'r3', date:'2025/09/06(土)', excerpt:'昨日はひまわり園で買い物に行きました！とても暑かったですが…', author:'佐藤' },
-];
-
+/* =========================
+   メイン（ダッシュボード）
+   ========================= */
 export default function DashboardHome() {
+  const navigate = useNavigate();
+
+  // KPI（今日／昨日）
+  const [todayViews, setTodayViews] = useState(0);
+  const [ydayViews, setYdayViews] = useState(0);
+  const [todayApps, setTodayApps] = useState(0);
+  const [ydayApps, setYdayApps] = useState(0);
+  const [todayPosts, setTodayPosts] = useState(0);
+  const [ydayPosts, setYdayPosts] = useState(0);
+  const [todayApproved, setTodayApproved] = useState(0);
+  const [ydayApproved, setYdayApproved] = useState(0);
+
+  // 合同グラフ（直近7日）
+  const [series, setSeries] = useState<
+    { date: string; views: number; apps: number; posts: number; approved: number }[]
+  >([]);
+
+  // 一覧
+  const [jobs, setJobs] = useState<PublicJob[]>([]);
+  const [licologs, setLicologs] = useState<LicologPost[]>([]);
+
+  const today0 = useMemo(() => startOfDay(new Date()), []);
+  const yday0 = useMemo(() => startOfDay(addDays(new Date(), -1)), []);
+  const week0 = useMemo(() => startOfDay(addDays(new Date(), -6)), []);
+
+  /* ---------- KPI 監視 ---------- */
+  useEffect(() => {
+    // 閲覧数（jobViews）
+    const qViewsToday = query(
+      collection(db, `organizations/${ORG_ID}/jobViews`),
+      where("viewedAt", ">=", Timestamp.fromDate(today0))
+    );
+    const qViewsYday = query(
+      collection(db, `organizations/${ORG_ID}/jobViews`),
+      where("viewedAt", ">=", Timestamp.fromDate(yday0)),
+      where("viewedAt", "<", Timestamp.fromDate(today0))
+    );
+    const u1 = onSnapshot(qViewsToday, (s) => setTodayViews(s.size));
+    const u2 = onSnapshot(qViewsYday, (s) => setYdayViews(s.size));
+
+    // 応募（applications）
+    const qAppsToday = query(
+      collection(db, `organizations/${ORG_ID}/applications`),
+      where("createdAt", ">=", Timestamp.fromDate(today0))
+    );
+    const qAppsYday = query(
+      collection(db, `organizations/${ORG_ID}/applications`),
+      where("createdAt", ">=", Timestamp.fromDate(yday0)),
+      where("createdAt", "<", Timestamp.fromDate(today0))
+    );
+    const u3 = onSnapshot(qAppsToday, (s) => setTodayApps(s.size));
+    const u4 = onSnapshot(qAppsYday, (s) => setYdayApps(s.size));
+
+    // リコログ投稿（licologPosts）
+    const qPostsToday = query(
+      collection(db, `organizations/${ORG_ID}/licologPosts`),
+      where("createdAt", ">=", Timestamp.fromDate(today0))
+    );
+    const qPostsYday = query(
+      collection(db, `organizations/${ORG_ID}/licologPosts`),
+      where("createdAt", ">=", Timestamp.fromDate(yday0)),
+      where("createdAt", "<", Timestamp.fromDate(today0))
+    );
+    const u5 = onSnapshot(qPostsToday, (s) => setTodayPosts(s.size));
+    const u6 = onSnapshot(qPostsYday, (s) => setYdayPosts(s.size));
+
+    // リコログ公開（events licolog_approved）
+    const qApprovedToday = query(
+      collection(db, `organizations/${ORG_ID}/events`),
+      where("type", "==", "licolog_approved"),
+      where("createdAt", ">=", Timestamp.fromDate(today0))
+    );
+    const qApprovedYday = query(
+      collection(db, `organizations/${ORG_ID}/events`),
+      where("type", "==", "licolog_approved"),
+      where("createdAt", ">=", Timestamp.fromDate(yday0)),
+      where("createdAt", "<", Timestamp.fromDate(today0))
+    );
+    const u7 = onSnapshot(qApprovedToday, (s) => setTodayApproved(s.size));
+    const u8 = onSnapshot(qApprovedYday, (s) => setYdayApproved(s.size));
+
+    return () => [u1, u2, u3, u4, u5, u6, u7, u8].forEach((u) => u());
+  }, [today0, yday0]);
+
+  /* ---------- 合同グラフ（7日） ---------- */
+  useEffect(() => {
+    // 7日分の土台
+    const days: { key: string; from: Date; to: Date }[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const d0 = startOfDay(addDays(new Date(), -i));
+      const d1 = startOfDay(addDays(new Date(), -(i - 1)));
+      days.push({ key: fmtMMDD(d0), from: d0, to: d1 });
+    }
+    const base = days.map((d) => ({ date: d.key, views: 0, apps: 0, posts: 0, approved: 0 }));
+    setSeries(base);
+
+    // 閲覧数（右軸棒）
+    const uA = onSnapshot(
+      query(
+        collection(db, `organizations/${ORG_ID}/jobViews`),
+        where("viewedAt", ">=", Timestamp.fromDate(week0)),
+        orderBy("viewedAt", "asc")
+      ),
+      (snap) => {
+        const copy = base.map((r) => ({ ...r, views: 0 }));
+        snap.forEach((d) => {
+          const t = d.get("viewedAt") as Timestamp | undefined;
+          if (!t) return;
+          const time = t.toDate().getTime();
+          days.forEach((day, idx) => {
+            if (time >= day.from.getTime() && time < day.to.getTime()) copy[idx].views++;
+          });
+        });
+        setSeries((prev) => copy.map((c, i) => ({ ...prev[i], ...c })));
+      }
+    );
+
+    // 応募
+    const uB = onSnapshot(
+      query(
+        collection(db, `organizations/${ORG_ID}/applications`),
+        where("createdAt", ">=", Timestamp.fromDate(week0)),
+        orderBy("createdAt", "asc")
+      ),
+      (snap) => {
+        setSeries((prev) => {
+          const copy = prev.length ? prev.map((p) => ({ ...p })) : base.map((r) => ({ ...r }));
+          snap.forEach((d) => {
+            const t = d.get("createdAt") as Timestamp | undefined;
+            if (!t) return;
+            const time = t.toDate().getTime();
+            days.forEach((day, idx) => {
+              if (time >= day.from.getTime() && time < day.to.getTime()) copy[idx].apps++;
+            });
+          });
+          return copy;
+        });
+      }
+    );
+
+    // リコログ投稿
+    const uC = onSnapshot(
+      query(
+        collection(db, `organizations/${ORG_ID}/licologPosts`),
+        where("createdAt", ">=", Timestamp.fromDate(week0)),
+        orderBy("createdAt", "asc")
+      ),
+      (snap) => {
+        setSeries((prev) => {
+          const copy = prev.length ? prev.map((p) => ({ ...p })) : base.map((r) => ({ ...r }));
+          snap.forEach((d) => {
+            const t = d.get("createdAt") as Timestamp | undefined;
+            if (!t) return;
+            const time = t.toDate().getTime();
+            days.forEach((day, idx) => {
+              if (time >= day.from.getTime() && time < day.to.getTime()) copy[idx].posts++;
+            });
+          });
+          return copy;
+        });
+      }
+    );
+
+    // リコログ公開
+    const uD = onSnapshot(
+      query(
+        collection(db, `organizations/${ORG_ID}/events`),
+        where("type", "==", "licolog_approved"),
+        where("createdAt", ">=", Timestamp.fromDate(week0)),
+        orderBy("createdAt", "asc")
+      ),
+      (snap) => {
+        setSeries((prev) => {
+          const copy = prev.length ? prev.map((p) => ({ ...p })) : base.map((r) => ({ ...r }));
+          snap.forEach((d) => {
+            const t = d.get("createdAt") as Timestamp | undefined;
+            if (!t) return;
+            const time = t.toDate().getTime();
+            days.forEach((day, idx) => {
+              if (time >= day.from.getTime() && time < day.to.getTime()) copy[idx].approved++;
+            });
+          });
+          return copy;
+        });
+      }
+    );
+
+    return () => [uA, uB, uC, uD].forEach((u) => u());
+  }, [week0]);
+
+  /* ---------- 一覧：Jobs & Licolog ---------- */
+  useEffect(() => {
+    const uJobs = onSnapshot(
+      query(
+        collection(db, `organizations/${ORG_ID}/publicJobs`),
+        orderBy("publishedAt", "desc"),
+        limit(5)
+      ),
+      (snap) => {
+        setJobs(snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })));
+      }
+    );
+
+    const uLico = onSnapshot(
+      query(
+        collection(db, `organizations/${ORG_ID}/licologPosts`),
+        orderBy("createdAt", "desc"),
+        limit(6)
+      ),
+      (snap) => {
+        setLicologs(snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })));
+      }
+    );
+
+    return () => {
+      uJobs();
+      uLico();
+    };
+  }, []);
+
   return (
-    <div className="px-4 sm:px-6 py-4 space-y-6">
-      {/* KPI */}
-      <section>
+    <div className="p-6 space-y-6">
+      {/* 合同グラフ */}
+      <div className="rounded-xl bg-white border border-black/5 p-4">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-semibold">主要数値</h2>
-          <button className="inline-flex items-center gap-1 text-sm text-[#3a3732]/70 hover:text-[#3a3732]">
-            今月 <ChevronDown size={16} />
-          </button>
+          <h3 className="text-base font-semibold">直近7日 合同トレンド</h3>
+          <div className="text-xs text-gray-500">
+            右軸：求人ページ閲覧数 / 左軸：応募・投稿・公開
+          </div>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-          {kpis.map((k) => (
-            <Card key={k.key}>
-              <CardBody>
-                <div className="flex items-start justify-between">
-                  <div className="text-sm opacity-80">{k.label}</div>
-                  <div className="opacity-60">
-                    {k.key === 'views' && <BarChart3 size={18} />}
-                    {k.key === 'applies' && <Users size={18} />}
-                    {k.key === 'LicologPosts' && <MessageSquare size={18} />}
-                    {k.key === 'LicologPublishes' && <FileText size={18} />}
-                  </div>
-                </div>
-                <div className="mt-1 text-3xl font-semibold tracking-tight">{k.value.toLocaleString()}</div>
-                <div className={cn("text-xs mt-1", k.diff >= 0 ? "text-[#f579a4]" : "text-rose-500")}>
-                  {k.diff >= 0 ? "+" : ""}{k.diff}%
-                </div>
-                <div className="mt-3 -mb-1"><Sparkline series={k.series} /></div>
-              </CardBody>
-            </Card>
-          ))}
+        <div className="h-[260px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart data={series}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+              <XAxis dataKey="date" />
+              <YAxis yAxisId="left" allowDecimals={false} />
+              <YAxis yAxisId="right" orientation="right" allowDecimals={false} />
+              <Tooltip />
+              <Legend />
+              <Bar yAxisId="right" dataKey="views" name="求人ページ閲覧数" fill="#93c5fd" />
+              <Line
+                yAxisId="left"
+                type="monotone"
+                dataKey="apps"
+                name="応募数"
+                stroke="#0ea5e9"
+                dot={false}
+              />
+              <Line
+                yAxisId="left"
+                type="monotone"
+                dataKey="posts"
+                name="リコログ投稿数"
+                stroke="#22c55e"
+                dot={false}
+              />
+              <Line
+                yAxisId="left"
+                type="monotone"
+                dataKey="approved"
+                name="リコログ公開数"
+                stroke="#f43f5e"
+                dot={false}
+              />
+            </ComposedChart>
+          </ResponsiveContainer>
         </div>
-      </section>
+      </div>
 
-      {/* Lists */}
-      <section className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        <Card>
-          <CardBody>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-base font-semibold">求人ページ一覧</h3>
-              <a href="#" className="text-sm text-[#3a3732]/70 hover:text-[#3a3732]">求人ページ一覧はこちら</a>
-            </div>
+      {/* KPI 4枚 */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <KpiCard title="求人ページ閲覧数" value={todayViews} delta={pctDelta(todayViews, ydayViews)} />
+        <KpiCard title="応募数" value={todayApps} delta={pctDelta(todayApps, ydayApps)} />
+        <KpiCard title="リコログ投稿数" value={todayPosts} delta={pctDelta(todayPosts, ydayPosts)} />
+        <KpiCard title="リコログ公開数" value={todayApproved} delta={pctDelta(todayApproved, ydayApproved)} />
+      </div>
+
+      {/* 下段：2カラム（求人一覧 / リコログ一覧） */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        {/* 求人一覧 */}
+        <section className="rounded-xl bg-white border border-black/5 p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-base font-semibold">求人ページ一覧</h3>
+            <Link to="/jobs" className="text-sm text-sky-600 hover:underline">
+              求人ページはこちら
+            </Link>
+          </div>
+
+          {jobs.length === 0 ? (
+            <div className="text-sm text-gray-500">まだ公開済みの求人はありません。</div>
+          ) : (
             <ul className="space-y-3">
-              {jobs.map((j) => (
-                <li key={j.id} className="flex items-center gap-3">
-                  <div className="h-14 w-20 rounded-lg bg-black/5 grid place-items-center text-xs text-[#3a3732]/60">NO IMAGE</div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <Badge intent={j.status === '公開中' ? 'pink' : 'gray'}>{j.status}</Badge>
-                      <div className="truncate text-sm">{j.title}</div>
+              {jobs.map((j) => {
+                const publicPath = `/p/${ORG_ID}/jobs/${j.id}`;
+                return (
+                  <li
+                    key={j.id}
+                    className="rounded-xl border border-black/5 bg-white p-3 flex items-center gap-3"
+                  >
+                    <div className="w-[72px] h-[48px] rounded-lg bg-gray-100 text-[10px] text-gray-400 grid place-items-center">
+                      NO IMAGE
                     </div>
-                  </div>
-                </li>
-              ))}
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium truncate">{j.title || "(無題)"}</div>
+                      <div className="text-xs text-gray-500">
+                        {j.publishedAt?.toDate?.()?.toLocaleString?.() ?? ""}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        className="px-3 py-1 rounded-lg border hover:bg-black/5"
+                        onClick={() => navigate(publicPath)}
+                      >
+                        開く
+                      </button>
+                      <a
+                        className="px-3 py-1 rounded-lg border hover:bg-black/5"
+                        href={publicPath}
+                        target="_blank"
+                        rel="noopener"
+                      >
+                        新しいタブで
+                      </a>
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
-          </CardBody>
-        </Card>
+          )}
+        </section>
 
-        <Card>
-          <CardBody>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-base font-semibold">リコログ投稿一覧</h3>
-              <a href="#" className="text-sm text-[#3a3732]/70 hover:text-[#3a3732]">リコログ一覧はこちら</a>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {Licologs.map((r) => (
-                <div key={r.id} className="rounded-2xl border border-black/5 p-3 bg-white">
-                  <div className="h-28 w-full rounded-xl bg-black/5 grid place-items-center text-sm text-[#3a3732]/60">NO IMAGE</div>
-                  <div className="mt-2 text-xs opacity-70">{r.date}</div>
-                  <div className="mt-1 text-sm leading-6 line-clamp-2">{r.excerpt}</div>
-                  <div className="mt-1 text-xs opacity-80">投稿者：{r.author}</div>
-                </div>
+        {/* リコログ一覧 */}
+        <section className="rounded-xl bg-white border border-black/5 p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-base font-semibold">リコログ投稿一覧</h3>
+            <Link to="/licolog" className="text-sm text-sky-600 hover:underline">
+              リコログ一覧はこちら
+            </Link>
+          </div>
+
+          {licologs.length === 0 ? (
+            <div className="text-sm text-gray-500">まだ投稿はありません。</div>
+          ) : (
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+              {licologs.map((p) => (
+                <article
+                  key={p.id}
+                  className="rounded-xl border border-black/5 bg-white p-3 flex flex-col"
+                >
+                  <div className="w-full h-[90px] rounded-lg bg-gray-100 text-[10px] text-gray-400 grid place-items-center">
+                    NO IMAGE
+                  </div>
+                  <div className="mt-2 text-xs text-gray-500">
+                    {p.createdAt?.toDate?.()?.toLocaleString?.() ?? ""}
+                  </div>
+                  <div className="mt-1 text-sm line-clamp-2">{p.body}</div>
+                  <div className="mt-auto pt-2">
+                    <span className="inline-block text-[11px] px-2 py-0.5 rounded-full bg-black/5">
+                      {p.status}
+                    </span>
+                  </div>
+                </article>
               ))}
             </div>
-          </CardBody>
-        </Card>
-      </section>
+          )}
+        </section>
+      </div>
 
-      {/* Footer notice（ダッシュボードホームに持たせる/不要なら外してOK） */}
-      <footer className="mt-6 bg-[#3a3732] text-white">
-        <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm"><AlertCircle size={16} /><span>【事務局からのお知らせ】現在、最新版のリコぺverは1.0です。リリースノートはこちら</span></div>
-          <div className="text-sm whitespace-nowrap">© GLOCALIZATION <span className="opacity-70 ml-3">規約とポリシー</span></div>
+      {/* フッター：お知らせ & コピーライト/ポリシー */}
+      <div className="rounded-xl border border-black/5 bg-[#111]/[0.02] px-4 py-3">
+        <div className="text-[12px]">
+          <span className="inline-block mr-2">【事務局からのお知らせ】</span>
+          現在、最新版のリコペ ver1.0 です。リリースノートは
+          <a className="text-sky-600 hover:underline ml-1" href="#" onClick={(e)=>e.preventDefault()}>
+            こちら
+          </a>
+        </div>
+      </div>
+
+      <footer className="py-6 text-[12px] text-gray-500 flex items-center justify-between">
+        <div>© GLOCALIZATION</div>
+        <div className="space-x-4">
+          <a className="hover:underline" href="#" onClick={(e)=>e.preventDefault()}>
+            規約
+          </a>
+          <a className="hover:underline" href="#" onClick={(e)=>e.preventDefault()}>
+            ポリシー
+          </a>
         </div>
       </footer>
+    </div>
+  );
+}
+
+/* ---------- サブ：KPI カード ---------- */
+function KpiCard({ title, value, delta }: { title: string; value: number; delta: number }) {
+  return (
+    <div className="rounded-xl bg-white border border-black/5 p-4">
+      <div className="text-sm text-gray-500">{title}</div>
+      <div className="mt-2 text-2xl font-semibold">{value.toLocaleString()}</div>
+      <div className={`mt-1 text-xs ${deltaColor(delta)}`}>
+        {delta >= 0 ? "+" : ""}
+        {delta}%（前日比）
+      </div>
     </div>
   );
 }

@@ -78,4 +78,26 @@ export const onApplicationCreated = functions.firestore
       subject,
       text,
     });
+    // ==== 追加：求人公開ページの閲覧を日次カウント ====
+    export const trackPublicJobView = functions.https.onCall(async (data, context) => {
+      const orgId = String(data?.orgId || "");
+      const pubId = String(data?.pubId || "");
+      if (!orgId || !pubId) {
+        throw new functions.https.HttpsError("invalid-argument", "orgId/pubId が必要です");
+      }
+      // 例: 2025-09-14
+      const now = admin.firestore.Timestamp.now().toDate();
+      const dateKey = now.toISOString().slice(0, 10);
+
+      const dailyRef = db.doc(`organizations/${orgId}/metrics/views/daily/${dateKey}`);
+      await db.runTransaction(async (tx) => {
+        const snap = await tx.get(dailyRef);
+        if (snap.exists) {
+          tx.update(dailyRef, { count: admin.firestore.FieldValue.increment(1) });
+        } else {
+          tx.set(dailyRef, { orgId, date: dateKey, count: 1, createdAt: admin.firestore.FieldValue.serverTimestamp() });
+        }
+      });
+      return { ok: true };
+    });
   });

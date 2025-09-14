@@ -1,73 +1,85 @@
 {
-  "hash": "8dfcc65d",
+  "hash": "7aef7f26",
   "configHash": "a52d3684",
-  "lockfileHash": "2f15a09d",
-  "browserHash": "c8bb8cc7",
+  "lockfileHash": "ff4fc05f",
+  "browserHash": "1f6e54ce",
   "optimized": {
     "react": {
       "src": "../../../../node_modules/react/index.js",
       "file": "react.js",
-      "fileHash": "4fdc92a8",
+      "fileHash": "c12d6173",
       "needsInterop": true
     },
     "react-dom": {
       "src": "../../../../node_modules/react-dom/index.js",
       "file": "react-dom.js",
-      "fileHash": "cd0f2740",
+      "fileHash": "8fa18b60",
       "needsInterop": true
     },
     "react/jsx-dev-runtime": {
       "src": "../../../../node_modules/react/jsx-dev-runtime.js",
       "file": "react_jsx-dev-runtime.js",
-      "fileHash": "22567765",
+      "fileHash": "6ea90db8",
       "needsInterop": true
     },
     "react/jsx-runtime": {
       "src": "../../../../node_modules/react/jsx-runtime.js",
       "file": "react_jsx-runtime.js",
-      "fileHash": "931e890a",
+      "fileHash": "61db8121",
       "needsInterop": true
     },
     "firebase/app": {
       "src": "../../../../node_modules/firebase/app/dist/esm/index.esm.js",
       "file": "firebase_app.js",
-      "fileHash": "fc2e5ae8",
+      "fileHash": "2d5078b0",
       "needsInterop": false
     },
     "firebase/auth": {
       "src": "../../../../node_modules/firebase/auth/dist/esm/index.esm.js",
       "file": "firebase_auth.js",
-      "fileHash": "584698ef",
+      "fileHash": "76e72809",
       "needsInterop": false
     },
     "firebase/firestore": {
       "src": "../../../../node_modules/firebase/firestore/dist/esm/index.esm.js",
       "file": "firebase_firestore.js",
-      "fileHash": "50ca1340",
+      "fileHash": "f14754ba",
+      "needsInterop": false
+    },
+    "firebase/functions": {
+      "src": "../../../../node_modules/firebase/functions/dist/esm/index.esm.js",
+      "file": "firebase_functions.js",
+      "fileHash": "c945b265",
       "needsInterop": false
     },
     "firebase/storage": {
       "src": "../../../../node_modules/firebase/storage/dist/esm/index.esm.js",
       "file": "firebase_storage.js",
-      "fileHash": "d09bee39",
+      "fileHash": "f46ced3a",
       "needsInterop": false
     },
-    "lucide-react": {
-      "src": "../../../../node_modules/lucide-react/dist/esm/lucide-react.js",
-      "file": "lucide-react.js",
-      "fileHash": "8005f80f",
+    "recharts": {
+      "src": "../../../../node_modules/recharts/es6/index.js",
+      "file": "recharts.js",
+      "fileHash": "9da63a09",
       "needsInterop": false
     },
     "react-dom/client": {
       "src": "../../../../node_modules/react-dom/client.js",
       "file": "react-dom_client.js",
-      "fileHash": "5dd51ad2",
+      "fileHash": "34ad0a5a",
       "needsInterop": true
     },
     "react-router-dom": {
       "src": "../../../../node_modules/react-router-dom/dist/index.mjs",
       "file": "react-router-dom.js",
-      "fileHash": "596ef0b1",
+      "fileHash": "4a6d2ef4",
+      "needsInterop": false
+    },
+    "lucide-react": {
+      "src": "../../../../node_modules/lucide-react/dist/esm/lucide-react.js",
+      "file": "lucide-react.js",
+      "fileHash": "c35a6223",
       "needsInterop": false
     }
   },
