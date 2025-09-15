@@ -4,7 +4,8 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import "./index.css";
 
-import { ensureSignedIn } from "./lib/firebase";
+import { auth, waitAuthReady } from "./lib/firebase";
+import { useOrgRole } from "./hooks/useOrgRole";
 
 // 管理レイアウト配下
 import Dashboard from "./pages/Dashboard";
@@ -14,27 +15,53 @@ import JobCreatePage from "./pages/jobs/JobCreatePage";
 import LicologPage from "./pages/LicologPage";
 import ApplicationsPage from "./pages/ApplicationsPage";
 
-// 公開ページ（管理レイアウトの外）
+// 公開配下（認証不要）
 import PublicJobPage from "./pages/public/PublicJobPage";
 import ApplyPage from "./pages/public/ApplyPage";
 
-function App() {
-  const [ready, setReady] = useState(false);
+// ログイン画面
+import Login from "./pages/Login";
 
-  // Auth(匿名)の確立を待ってから Router を作る
+// --- 認証ゲート：未ログインなら <Login /> を表示 ---
+function AuthGate({ children }: { children: React.ReactNode }) {
+  const [ready, setReady] = useState(false);
+  const [uid, setUid] = useState<string | null>(null);
+
   useEffect(() => {
-    ensureSignedIn().finally(() => setReady(true));
+    waitAuthReady().then((u) => {
+      setUid(u?.uid ?? null);
+      setReady(true);
+    });
+    const unsub = auth.onAuthStateChanged((u) => setUid(u?.uid ?? null));
+    return () => unsub();
   }, []);
 
-  if (!ready) {
-    return <div style={{ padding: 24 }}>Connecting to Auth/Firestore emulator…</div>;
-  }
+  if (!ready) return <div style={{ padding: 24 }}>Connecting Auth…</div>;
+  if (!uid) return <Login />;
+  return <RoleGate uid={uid}>{children}</RoleGate>;
+}
 
+// --- ロールゲート：組織ロール未付与ならブロック ---
+function RoleGate({ uid, children }: { uid: string; children: React.ReactNode }) {
+  const { role, loading } = useOrgRole(uid);
+
+  if (loading) return <div style={{ padding: 24 }}>Checking role…</div>;
+  if (!role) {
+    return (
+      <div className="p-8">
+        アクセス権がありません。管理者に問い合わせて、あなたのユーザーにロールを付与してください。
+      </div>
+    );
+  }
+  return <>{children}</>;
+}
+
+function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* 管理レイアウト配下 */}
-        <Route element={<Dashboard />}>
+        {/* 管理レイアウト配下（認証必須） */}
+        <Route element={<AuthGate><Dashboard /></AuthGate>}>
           <Route index element={<DashboardHome />} />
           <Route path="jobs" element={<JobsPage />} />
           <Route path="jobs/new" element={<JobCreatePage />} />
@@ -42,7 +69,7 @@ function App() {
           <Route path="applications" element={<ApplicationsPage />} />
         </Route>
 
-        {/* 公開ページ（レイアウト外） */}
+        {/* 公開ページ（認証不要） */}
         <Route path="/p/:orgId/jobs/:pubId" element={<PublicJobPage />} />
         <Route path="/p/:orgId/jobs/:pubId/apply" element={<ApplyPage />} />
 

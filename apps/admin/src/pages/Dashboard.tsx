@@ -7,6 +7,11 @@ import {
   ChevronsLeft, ChevronsRight, Menu as MenuIcon
 } from "lucide-react";
 
+import { doSignOut, auth } from "@/lib/firebase";
+import { ORG_ID } from "@/lib/auth";
+// ▼ ここ：契約IDで施設を引くフックを使う
+import { useOrgMeta, useMyMember, useFacilityMetaByContractId } from "@/lib/org";
+
 function cn(...a: Array<string | false | null | undefined>) {
   return a.filter(Boolean).join(" ");
 }
@@ -14,6 +19,12 @@ function cn(...a: Array<string | false | null | undefined>) {
 export default function Dashboard() {
   const [collapsed, setCollapsed] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+
+  // メタ情報
+  const uid = auth.currentUser?.uid ?? null;
+  const org = useOrgMeta(ORG_ID);
+  const me = useMyMember(ORG_ID, uid);
+  const facility = useFacilityMetaByContractId(ORG_ID, me?.facilityId); // ★ 修正点
 
   return (
     <div className="min-h-screen bg-[#f8f8f8] text-[#3a3732]">
@@ -23,11 +34,15 @@ export default function Dashboard() {
           <div className="flex items-center gap-3">
             <span className="text-white font-bold text-xl tracking-tight">Licope!</span>
             <div className="hidden sm:block text-white/95 text-sm">
-              社会福祉法人 岩手盛岡園 <span className="opacity-80">|</span> 契約ID: FDENIS001
+              {org?.name ?? "—"} <span className="opacity-80">|</span>{" "}
+              {facility?.name ?? "—"} <span className="opacity-80">|</span>{" "}
+              契約ID: {facility?.contractId ?? "—"}
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <div className="hidden sm:block text-white/95 text-sm mr-2">リコベ 太郎</div>
+            <div className="hidden sm:block text-white/95 text-sm mr-2">
+              {me?.displayName ?? "—"}
+            </div>
             <div className="relative">
               <button aria-label="お知らせ" className="p-2 rounded-full hover:bg-white/15 text-white">
                 <Bell size={18} />
@@ -41,14 +56,16 @@ export default function Dashboard() {
               <button
                 aria-label="ユーザーメニュー"
                 onClick={() => setMenuOpen((v) => !v)}
-                className="p-2 rounded-full hover:bg白/15 text-white flex items-center"
+                className="p-2 rounded-full hover:bg-white/15 text-white flex items-center"
               >
                 <MenuIcon size={18} />
               </button>
               {menuOpen && (
                 <div className="absolute right-0 mt-2 w-40 rounded-xl bg-white shadow-lg text-sm text-[#3a3732]">
                   <button className="w-full text-left px-3 py-2 hover:bg-black/5">ユーザー設定</button>
-                  <button className="w-full text-left px-3 py-2 hover:bgブラック/5">ログアウト</button>
+                  <button className="w-full text-left px-3 py-2 hover:bg-black/5" onClick={() => doSignOut()}>
+                    ログアウト
+                  </button>
                 </div>
               )}
             </div>
@@ -67,10 +84,8 @@ export default function Dashboard() {
               <NavItem to="/jobs" collapsed={collapsed} icon={FileText} label="求人ページ" />
               <NavItem to="/licolog" collapsed={collapsed} icon={MessageSquare} label="リコログ" />
               <NavItem to="/works" collapsed={collapsed} icon={Briefcase} label="リコペワークス" />
-              <NavItem to="/analytics" collapsed={collapsed} icon={BarChart3} label="詳細分析" />
-
+              <NavItem to="/analytics" collapsed={collapsed} icon={BarChart3} label="詳細分析(準備中)" />
               <div className="mt-4 space-y-2">
-                {/* 作成ボタンは NavLink（見た目は今のまま） */}
                 <NavLink
                   to="/jobs/new"
                   className={cn("w-full inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-medium bg-[#f579a4] text-white hover:opacity-90", collapsed && "justify-center px-2")}
@@ -80,7 +95,6 @@ export default function Dashboard() {
                 <NavItem to="/applications" collapsed={collapsed} icon={Users} label="応募管理" />
               </div>
             </div>
-
             <div className="pt-4 border-t border-black/5">
               <NavItem to="/settings" collapsed={collapsed} icon={Settings} label="設定" />
               <button
@@ -116,7 +130,6 @@ function NavItem({ to, icon: Icon, label, collapsed, end=false }:{
         cn(
           "group flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-black/5 transition-colors",
           collapsed && "justify-center",
-          // アクティブ時の色変化は不要とのことなので装飾は付けない
           ""
         )
       }
