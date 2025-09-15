@@ -10,6 +10,8 @@ const app = initializeApp({
   apiKey: "demo",
   authDomain: "localhost",
   projectId: "licope-lab",
+  // ★ これが無いと Storage に書き込むときに "no default bucket" になります
+  storageBucket: "licope-lab.appspot.com",
 });
 
 export const auth = getAuth(app);

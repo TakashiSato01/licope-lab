@@ -1,3 +1,4 @@
+// apps/licolog/src/lib/types/licolog.ts
 export type RicologStatus = "internal" | "approved" | "hidden";
 export interface RicologMedia {
   path: string; width: number; height: number; bytes: number;

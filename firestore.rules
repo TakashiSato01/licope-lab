@@ -2,10 +2,11 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    /** 共通ユーティリティ */
     function signedIn() { return request.auth != null; }
     function isString(x) { return x is string && x.size() <= 5000; }
 
-    // メンバーロール取得（存在しなければ null）
+    /** メンバーのロール（存在しなければ null）*/
     function roleOf(orgId) {
       return request.auth != null
         ? get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.role
@@ -15,26 +16,27 @@ service cloud.firestore {
       return signedIn() && roles.hasAny([roleOf(orgId)]);
     }
 
+    /** テナント境界：全データは organizations/{orgId} 配下に置く前提 */
     match /organizations/{orgId} {
 
-      // ── 法人メタ（name）はサインイン済みなら read 可、更新は管理権限のみ
-      allow read: if signedIn();
+      // ───────── 法人メタ（org doc 本体）
+      allow read:   if signedIn();
       allow update: if hasAnyRole(orgId, ['owner','admin']);
       allow create, delete: if false;
 
-      // ── 施設（契約単位）
+      // ───────── 施設（契約単位）
       match /facilities/{facilityId} {
-        allow read: if signedIn();
+        allow read:  if signedIn();
         allow write: if hasAnyRole(orgId, ['owner','admin']);
       }
 
-      // ── メンバー
+      // ───────── メンバー
       match /members/{uid} {
-        allow read: if signedIn() && (request.auth.uid == uid || hasAnyRole(orgId, ['owner','admin']));
+        allow read:  if signedIn() && (request.auth.uid == uid || hasAnyRole(orgId, ['owner','admin']));
         allow write: if hasAnyRole(orgId, ['owner','admin']);
       }
 
-      // ── 公開求人メタ（誰でも read）
+      // ───────── 公開求人メタ
       match /publicJobs/{pubId} {
         allow read: if true;
         allow create: if hasAnyRole(orgId, ['owner','admin','editor'])
@@ -46,42 +48,64 @@ service cloud.firestore {
         allow update, delete: if false;
       }
 
-      // ── リコログ（作成は pending 固定／承認は一方通行）
+      // ───────── リコログ
       match /licologPosts/{postId} {
+
+        // 作成：ログイン + orgId 一致 + status は pending 固定
         allow create: if signedIn()
           && request.resource.data.orgId == orgId
           && request.resource.data.status == 'pending';
-        allow read: if signedIn();
+
+        // 閲覧：管理画面は要ログイン。公開ページでは approved のみ可
+        allow read: if signedIn() || resource.data.status == 'approved';
+
+        // ✅ 作者の通常編集：本文/画像の追加削除・updatedAt の更新のみ。
+        //    いずれも pending のまま（createdAt/orgId/authorUid/facilityId は不変）
+        allow update: if signedIn()
+          && resource.data.authorUid == request.auth.uid
+          && resource.data.orgId == orgId
+          && request.resource.data.orgId == orgId
+          && request.resource.data.authorUid == resource.data.authorUid
+          && request.resource.data.facilityId == resource.data.facilityId
+          && request.resource.data.createdAt == resource.data.createdAt
+          && resource.data.status == 'pending'
+          && request.resource.data.status == 'pending';
+
+        // 承認：editor 以上のみ、pending → approved/hidden の一方向
         allow update: if hasAnyRole(orgId, ['owner','admin','editor'])
           && resource.data.orgId == orgId
           && request.resource.data.orgId == orgId
           && resource.data.status == 'pending'
           && request.resource.data.status in ['approved','hidden'];
+
+        // 物理削除は不可
         allow delete: if false;
       }
 
-      // ── 承認イベント履歴（参照: editor 以上、作成: editor 以上）
+      // ───────── 承認イベント履歴
       match /events/{eventId} {
-        allow read: if hasAnyRole(orgId, ['owner','admin','editor']);
+        allow read:   if hasAnyRole(orgId, ['owner','admin','editor']);
         allow create: if hasAnyRole(orgId, ['owner','admin','editor'])
           && request.resource.data.orgId == orgId;
         allow update, delete: if false;
       }
 
-      // ── 応募（個人情報: admin 以上のみ参照可、作成は誰でも）
+      // ───────── 応募（個人情報）
       match /applications/{appId} {
+        // 公開フォームからの作成のみ許可（必須項目）
         allow create: if request.resource.data.orgId == orgId
           && isString(request.resource.data.jobPubId)
           && isString(request.resource.data.name)
           && isString(request.resource.data.contact)
           && request.resource.data.createdAt is timestamp;
+        // 閲覧は owner/admin のみ
         allow read: if hasAnyRole(orgId, ['owner','admin']);
         allow update, delete: if false;
       }
 
-      // ── メトリクス（Functions が書く／管理画面からは read）
+      // ───────── メトリクス（Functions が書く）
       match /metrics/{document=**} {
-        allow read: if hasAnyRole(orgId, ['owner','admin','editor','staff','viewer']);
+        allow read:  if hasAnyRole(orgId, ['owner','admin','editor','staff','viewer']);
         allow write: if false;
       }
     }

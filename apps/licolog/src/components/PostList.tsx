@@ -1,25 +1,39 @@
-// apps/licolog/src/components/PostList.tsx
 import React, { useEffect, useState } from "react";
-import { subscribeLicologPosts } from "../lib/repositories/licolog";
-import type { LicologPost } from "../lib/types"; // ★型は types.ts から
+import PostCard from "./PostCard";
+import {
+  LicologPost,
+  subscribeMyPosts,
+  subscribeOrgWall,
+} from "/src/lib/repositories/licolog";
 
-export default function PostList() {
-  const [items, setItems] = useState<LicologPost[]>([]);
+type Scope = "org" | "mine";
+
+export default function PostList({ scope }: { scope: Scope }) {
+  const [rows, setRows] = useState<LicologPost[]>([]);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const unsub = subscribeLicologPosts(setItems);
+    setReady(false);
+    const unsub =
+      scope === "org"
+        ? subscribeOrgWall((ps) => {
+            setRows(ps);
+            setReady(true);
+          })
+        : subscribeMyPosts((ps) => {
+            setRows(ps);
+            setReady(true);
+          });
     return () => unsub();
-  }, []);
+  }, [scope]);
+
+  if (!ready) return <div className="text-white/70">読み込み中…</div>;
+  if (rows.length === 0) return <div className="text-white/70">まだ投稿はありません。</div>;
 
   return (
-    <div className="space-y-4 pb-28">
-      {items.map((p) => (
-        <div key={p.id} className="border border-neutral-700 rounded-xl p-4">
-          <div className="text-xs text-neutral-400">
-            {p.status}・{p.facilityId}
-          </div>
-          <div className="mt-2">{p.body}</div>
-        </div>
+    <div className="space-y-3">
+      {rows.map((p) => (
+        <PostCard key={p.id} post={p} />
       ))}
     </div>
   );

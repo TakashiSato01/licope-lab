@@ -1,21 +1,19 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
+    function signedIn() { return request.auth != null; }
 
-    // 公開済み求人のスナップショット JSON パス
-    function isPublicJobJsonExisting() {
-      return resource.name.matches('public/orgs/[^/]+/jobs/[^/]+\\.json');
+    // 公開スナップショット（求人の JSON など）は誰でも読める
+    match /public/{path=**} {
+      allow read: if true;
+      allow write: if false;
     }
-    function isPublicJobJsonNew() {
-      return request.resource.name.matches('public/orgs/[^/]+/jobs/[^/]+\\.json');
-    }
 
-    match /{allPaths=**} {
-      // 公開ページから誰でも読めるのは、公開 JSON のみ
-      allow read: if isPublicJobJsonExisting();
-
-      // 書き込みは管理画面（認証済み）から公開 JSON のみ
-      allow write: if request.auth != null && isPublicJobJsonNew();
+    // リコログの画像：ログインしている人だけ閲覧可
+    // 書き込み（新規/上書き/削除）は本人のみ
+    match /orgs/{orgId}/users/{uid}/posts/{postId}/{fileName} {
+      allow read:  if signedIn();
+      allow write: if signedIn() && request.auth.uid == uid;
     }
   }
 }
