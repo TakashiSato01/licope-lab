@@ -1,65 +1,49 @@
 import React, { useEffect, useState } from "react";
-import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Link } from "react-router-dom";
+import { ORG_ID } from "@/lib/auth";
+import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 
-type Application = {
-  id: string;
-  orgId: string;
-  jobPubId: string;
-  name: string;
-  contact: string;
-  message: string;
-  createdAt?: any;
-};
-
-const ORG_ID = "demo-org";
+type AppItem = { id: string; name: string; contact: string; message?: string; createdAt?: any };
 
 export default function ApplicationsPage() {
-  const [items, setItems] = useState<Application[]>([]);
+  const [rows, setRows] = useState<AppItem[]>([]);
 
   useEffect(() => {
-    const q = query(
-      collection(db, `organizations/${ORG_ID}/applications`),
-      orderBy("createdAt", "desc")
-    );
-    const unsub = onSnapshot(q, (snap) => {
-      setItems(snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })));
-    });
-    return unsub;
+    const qy = query(collection(db, `organizations/${ORG_ID}/applications`), orderBy("createdAt","desc"));
+    const unsub = onSnapshot(qy, s => setRows(s.docs.map(d=>({id:d.id, ...(d.data() as any)}))));
+    return () => unsub();
   }, []);
 
   return (
     <div className="p-6">
-      <h2 className="text-lg font-semibold mb-4">応募管理</h2>
-
-      {items.length === 0 ? (
+      <div className="text-xl font-bold mb-4">応募管理</div>
+      {rows.length === 0 ? (
         <div className="text-sm text-gray-500">まだ応募はありません。</div>
       ) : (
-        <ul className="space-y-3">
-          {items.map((a) => (
-            <li key={a.id} className="rounded-xl border border-black/5 bg-white p-4">
-              <div className="text-sm text-gray-500 mb-1">
-                {a.createdAt?.toDate ? a.createdAt.toDate().toLocaleString() : ""} / ID:{a.id}
-              </div>
-              <div className="font-medium">{a.name}</div>
-              <div className="text-sm text-gray-600">連絡先: {a.contact}</div>
-              {a.message && (
-                <div className="mt-2 whitespace-pre-wrap text-sm">{a.message}</div>
-              )}
-              <div className="mt-3">
-                <Link
-                  to={`/p/${a.orgId}/jobs/${a.jobPubId}`}
-                  target="_blank"
-                  className="underline text-sm"
-                >
-                  対象の求人ページを開く
-                </Link>
+        <ul className="grid md:grid-cols-2 gap-4">
+          {rows.map(a => (
+            <li key={a.id} className="rounded-2xl bg-white p-4 border border-black/5">
+              <div className="flex items-start gap-3">
+                <Avatar name={a.name} />
+                <div className="flex-1">
+                  <div className="font-semibold">{a.name}</div>
+                  <div className="text-sm text-gray-500">{a.contact}</div>
+                  {a.message && <div className="mt-2 text-sm whitespace-pre-wrap">{a.message}</div>}
+                </div>
               </div>
             </li>
           ))}
         </ul>
       )}
+    </div>
+  );
+}
+
+function Avatar({ name }: {name?: string}) {
+  const letter = (name?.[0] ?? "A").toUpperCase();
+  return (
+    <div className="h-10 w-10 rounded-full bg-gradient-to-br from-pink-200 to-orange-200 flex items-center justify-center font-bold">
+      {letter}
     </div>
   );
 }

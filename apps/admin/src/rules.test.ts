@@ -1,56 +1,93 @@
-import { test, expect, describe, beforeAll, afterAll } from 'vitest';
-import { assertFails, assertSucceeds, initializeTestEnvironment, RulesTestEnvironment } from "@firebase/rules-unit-testing";
+// apps/admin/src/rules.test.ts
+import { describe, it, beforeAll, afterAll } from "vitest";
+import {
+  initializeTestEnvironment,
+  RulesTestEnvironment,
+  assertFails,
+  assertSucceeds,
+} from "@firebase/rules-unit-testing";
 import fs from "fs";
+import path from "path";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 
 describe("Firestore Security Rules", () => {
-    let testEnv: RulesTestEnvironment;
+  let testEnv: RulesTestEnvironment;
 
-    beforeAll(async () => {
-        testEnv = await initializeTestEnvironment({
-          projectId: "licope-lab-test",
-          firestore: {
-            host: process.env.FIRESTORE_EMULATOR_HOST?.split(":")[0] ?? "127.0.0.1",
-            port: Number(process.env.FIRESTORE_EMULATOR_HOST?.split(":")[1] ?? 8080),
-        rules: fs.readFileSync("firestore.rules", "utf8"), }
+  beforeAll(async () => {
+    testEnv = await initializeTestEnvironment({
+      projectId: "licope-lab-test",
+      firestore: {
+        host: process.env.FIRESTORE_EMULATOR_HOST?.split(":")[0] ?? "127.0.0.1",
+        port: Number(process.env.FIRESTORE_EMULATOR_HOST?.split(":")[1] ?? 8080),
+        rules: fs.readFileSync(
+          path.resolve(process.cwd(), "firestore.rules"),
+          "utf8"
+        ),
+      },
     });
-    });
-
-    afterAll(async () => {
-        await testEnv.cleanup();
-    });
-
-    test("認証されていないユーザーは、jobsコレクションに書き込めない", async () => {
-        const anonDb = testEnv.unauthenticatedContext().firestore();
-        await assertFails(anonDb.collection("jobs").add({ title: "B" }));
-    });
-
-// apps/admin/src/rules.test.ts の「認証されたユーザーは、jobsコレクションに書き込める」
-test("認証されたユーザーは、jobsコレクションに書き込める", async () => {
-  const authedDb = testEnv.authenticatedContext("user_abc").firestore();
-  const orgId = "demo-org";
-  await assertSucceeds(
-    authedDb.collection(`organizations/${orgId}/jobs`).add({
-      orgId,
-      status: "draft",      // ルールが要求
-      title: "A",           // 簡単な文字列でOK
-      wage: "1000"          // 文字列 or number どちらでも可（ルール側が許容）
-      // createdAt は付けない（undefined を送るとクライアント側で弾かれる）
-    })
-  );
-});
-    
-    test("オーナーではない認証ユーザーは、organizationsコレクションに書き込めない", async () => {
-      const orgId = "org_xyz";
-      const userId = "user_abc";
-
-  // 事前準備: 管理者視点でシードデータ作成
-      await testEnv.withSecurityRulesDisabled(async (ctx) => {
-        await ctx.firestore().doc(`organizations/${orgId}`).set({ name: "Initial Corp" });
-    });
-
-  // 検証: 認証済みでも一般ユーザーは書けない
-      const userDb = testEnv.authenticatedContext(userId).firestore();
-      await assertFails(userDb.doc(`organizations/${orgId}`).set({ name: "Test Corp" }));
   });
 
+  afterAll(async () => {
+    await testEnv.cleanup();
+  });
+
+  // 未ログインは publicJobs を作成できない
+  it("未ログインは organizations/{orgId}/publicJobs に書き込めない", async () => {
+    const orgId = "demo-org";
+    const db = testEnv.unauthenticatedContext().firestore();
+
+    await assertFails(
+      setDoc(doc(db, `organizations/${orgId}/publicJobs/ANONPUB`), {
+        orgId,
+        title: "NG",
+        storagePath: "public/orgs/demo-org/jobs/ANONPUB.json",
+        publishedAt: serverTimestamp(),
+        publishedBy: "anon",
+      })
+    );
+  });
+
+  // editor は発行できる
+  it("認証された editor は organizations/{orgId}/publicJobs に発行できる", async () => {
+    const orgId = "demo-org";
+    const uid = "user_editor";
+
+    // seed: members/{uid}.role = "editor"
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(
+        doc(ctx.firestore(), `organizations/${orgId}/members/${uid}`),
+        { role: "editor", email: "editor@example.com", displayName: "Editor" }
+      );
+    });
+
+    const db = testEnv.authenticatedContext(uid).firestore();
+
+    await assertSucceeds(
+      setDoc(doc(db, `organizations/${orgId}/publicJobs/TESTPUB1`), {
+        orgId,
+        title: "テスト求人",
+        storagePath: "public/orgs/demo-org/jobs/TESTPUB1.json",
+        publishedAt: serverTimestamp(),
+        publishedBy: uid,
+      })
+    );
+  });
+
+  // 一般ユーザーは org 本体を更新できない
+  it("オーナーではない認証ユーザーは organizations/{orgId} を更新できない", async () => {
+    const orgId = "org_xyz";
+    const uid = "user_abc";
+
+    // seed: org doc
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), `organizations/${orgId}`), {
+        name: "Initial Corp",
+      });
+    });
+
+    const db = testEnv.authenticatedContext(uid).firestore();
+    await assertFails(
+      setDoc(doc(db, `organizations/${orgId}`), { name: "Updated Corp" })
+    );
+  });
 });

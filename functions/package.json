@@ -12,7 +12,10 @@
     "nodemailer": "^6.9.13"
   },
   "devDependencies": {
+    "@types/nodemailer": "^7.0.1",
     "typescript": "^5.5.4"
   },
-  "engines": { "node": "18" }
+  "engines": {
+    "node": "18"
+  }
 }

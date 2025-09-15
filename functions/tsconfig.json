@@ -5,7 +5,13 @@
     "target": "es2021",
     "outDir": "lib",
     "rootDir": "src",
-    "strict": true
+    "strict": true,
+    "types": ["node"],
+    "skipLibCheck": true
   },
-  "include": ["src"]
+  "compilerOptions": {
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true
+  },
+  "include": ["src/**/*.ts"],
 }

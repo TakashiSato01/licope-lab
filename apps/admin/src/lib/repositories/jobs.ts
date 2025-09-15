@@ -1,3 +1,4 @@
+// repositories/jobs.ts
 import { collection, doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { ref, uploadString } from "firebase/storage";
 import { auth, db, storage } from "@/lib/firebase";

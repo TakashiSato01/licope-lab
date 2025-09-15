@@ -1,19 +1,28 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
+
     function signedIn() { return request.auth != null; }
 
-    // 公開スナップショット（求人の JSON など）は誰でも読める
-    match /public/{path=**} {
-      allow read: if true;
-      allow write: if false;
+    // --- リコログのユーザーアップロード（自分のものだけ書ける）
+    match /orgs/{orgId}/users/{uid}/posts/{postId}/{fileName} {
+      // 閲覧はログイン済みユーザー（社内向け想定）
+      allow read: if signedIn();
+      // 自分の領域のみ書き込み可
+      allow write: if signedIn() && request.auth.uid == uid;
     }
 
-    // リコログの画像：ログインしている人だけ閲覧可
-    // 書き込み（新規/上書き/削除）は本人のみ
-    match /orgs/{orgId}/users/{uid}/posts/{postId}/{fileName} {
-      allow read:  if signedIn();
-      allow write: if signedIn() && request.auth.uid == uid;
+    // --- 公開用の静的アセット（求人 JSON など）
+    // 読み取りは誰でも可、書き込みは開発中は「サインイン済みなら可」
+    // ※本番では Cloud Functions(admin SDK) 経由に寄せる想定
+    match /public/{path=**} {
+      allow read: if true;
+      allow write: if signedIn();
+    }
+
+    // それ以外はデフォルト拒否
+    match /{allPaths=**} {
+      allow read, write: if false;
     }
   }
 }

@@ -81,18 +81,18 @@ export default function Dashboard() {
           <nav className="py-4 flex flex-col h-full">
             <div className="flex-1">
               <NavItem to="/" collapsed={collapsed} icon={LayoutDashboard} label="ダッシュボード" end />
-              <NavItem to="/jobs" collapsed={collapsed} icon={FileText} label="求人ページ" />
-              <NavItem to="/licolog" collapsed={collapsed} icon={MessageSquare} label="リコログ" />
-              <NavItem to="/works" collapsed={collapsed} icon={Briefcase} label="リコペワークス" />
+              <NavItem to="/jobs" collapsed={collapsed} icon={FileText} label="求人ページ一覧" />
+              <NavItem to="/licolog" collapsed={collapsed} icon={MessageSquare} label="投稿されたリコログ" />
+              <NavItem to="/works" collapsed={collapsed} icon={Briefcase} label="リコペワークス(準備中)" />
               <NavItem to="/analytics" collapsed={collapsed} icon={BarChart3} label="詳細分析(準備中)" />
+                <NavItem to="/applications" collapsed={collapsed} icon={Users} label="応募管理" />
               <div className="mt-4 space-y-2">
                 <NavLink
                   to="/jobs/new"
                   className={cn("w-full inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-medium bg-[#f579a4] text-white hover:opacity-90", collapsed && "justify-center px-2")}
                 >
-                  <FileText size={16} /> {!collapsed && <span>求人ページを作成する</span>}
+                  <FileText size={16} /> {!collapsed && <span>かんたん求人ページ作成</span>}
                 </NavLink>
-                <NavItem to="/applications" collapsed={collapsed} icon={Users} label="応募管理" />
               </div>
             </div>
             <div className="pt-4 border-t border-black/5">
