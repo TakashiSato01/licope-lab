@@ -1,12 +1,11 @@
 // apps/licolog/src/lib/types/licolog.ts
-export type RicologStatus = "internal" | "approved" | "hidden";
-export interface RicologMedia {
-  path: string; width: number; height: number; bytes: number;
-}
-export interface RicologPost {
-  id?: string;
+  export type LicologStatus = "pending" | "approved" | "hidden";
+  export interface LicologMedia {
+    path: string; width?: number; height?: number; bytes?: number;
+  }
+  export interface LicologPost {  id?: string;
   body: string;
-  media: LicologMedia[];
+  media?: LicologMedia[];
   authorUid: string;
   orgId: string;
   facilityId: string;

@@ -1,4 +1,3 @@
-// apps/admin/src/main.tsx
 import React, { useEffect, useState } from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
@@ -14,6 +13,8 @@ import JobsPage from "./pages/JobsPage";
 import JobCreatePage from "./pages/jobs/JobCreatePage";
 import LicologPage from "./pages/LicologPage";
 import ApplicationsPage from "./pages/ApplicationsPage";
+import TokushoPage from "./pages/TokushoPage";
+import PolicyPage from "./pages/PolicyPage";
 
 // 公開配下（認証不要）
 import PublicJobPage from "./pages/public/PublicJobPage";
@@ -60,18 +61,21 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* 管理レイアウト配下（認証必須） */}
+        {/* 管理レイアウト配下（Outletで表示） */}
         <Route element={<AuthGate><Dashboard /></AuthGate>}>
           <Route index element={<DashboardHome />} />
           <Route path="jobs" element={<JobsPage />} />
           <Route path="jobs/new" element={<JobCreatePage />} />
           <Route path="licolog" element={<LicologPage />} />
           <Route path="applications" element={<ApplicationsPage />} />
+          {/* 法務ページを Outlet に出す */}
+          <Route path="legal/tokusho" element={<TokushoPage />} />
+          <Route path="legal/policy" element={<PolicyPage />} />
         </Route>
 
         {/* 公開ページ（認証不要） */}
-        <Route path="/p/:orgId/jobs/:pubId" element={<PublicJobPage />} />
-        <Route path="/p/:orgId/jobs/:pubId/apply" element={<ApplyPage />} />
+        <Route path="/p/:orgId/jobs/:jobId" element={<PublicJobPage />} />
+        <Route path="/p/:orgId/jobs/:jobId/apply" element={<ApplyPage />} />
 
         {/* 不明ルートはトップへ */}
         <Route path="*" element={<Navigate to="/" replace />} />

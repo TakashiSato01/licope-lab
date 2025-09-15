@@ -9,7 +9,7 @@ import {
   Timestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, NavLink } from "react-router-dom";
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -47,6 +47,8 @@ function pctDelta(curr: number, prev: number) {
 function deltaColor(p: number) {
   return p >= 0 ? "text-sky-600" : "text-[#f579a4]";
 }
+const nav = ({ isActive }: { isActive: boolean }) =>
+  `hover:underline ${isActive ? "text-sky-600" : "text-gray-500"}`;
 
 /* ---------- 型 ---------- */
 type PublicJob = {
@@ -94,7 +96,6 @@ export default function DashboardHome() {
 
   /* ---------- KPI 監視 ---------- */
   useEffect(() => {
-    // 閲覧数（jobViews）
     const qViewsToday = query(
       collection(db, `organizations/${ORG_ID}/jobViews`),
       where("viewedAt", ">=", Timestamp.fromDate(today0))
@@ -107,7 +108,6 @@ export default function DashboardHome() {
     const u1 = onSnapshot(qViewsToday, (s) => setTodayViews(s.size));
     const u2 = onSnapshot(qViewsYday, (s) => setYdayViews(s.size));
 
-    // 応募（applications）
     const qAppsToday = query(
       collection(db, `organizations/${ORG_ID}/applications`),
       where("createdAt", ">=", Timestamp.fromDate(today0))
@@ -120,7 +120,6 @@ export default function DashboardHome() {
     const u3 = onSnapshot(qAppsToday, (s) => setTodayApps(s.size));
     const u4 = onSnapshot(qAppsYday, (s) => setYdayApps(s.size));
 
-    // リコログ投稿（licologPosts）
     const qPostsToday = query(
       collection(db, `organizations/${ORG_ID}/licologPosts`),
       where("createdAt", ">=", Timestamp.fromDate(today0))
@@ -133,7 +132,6 @@ export default function DashboardHome() {
     const u5 = onSnapshot(qPostsToday, (s) => setTodayPosts(s.size));
     const u6 = onSnapshot(qPostsYday, (s) => setYdayPosts(s.size));
 
-    // リコログ公開（events licolog_approved）
     const qApprovedToday = query(
       collection(db, `organizations/${ORG_ID}/events`),
       where("type", "==", "licolog_approved"),
@@ -153,7 +151,6 @@ export default function DashboardHome() {
 
   /* ---------- 合同グラフ（7日） ---------- */
   useEffect(() => {
-    // 7日分の土台
     const days: { key: string; from: Date; to: Date }[] = [];
     for (let i = 6; i >= 0; i--) {
       const d0 = startOfDay(addDays(new Date(), -i));
@@ -163,7 +160,6 @@ export default function DashboardHome() {
     const base = days.map((d) => ({ date: d.key, views: 0, apps: 0, posts: 0, approved: 0 }));
     setSeries(base);
 
-    // 閲覧数（右軸棒）
     const uA = onSnapshot(
       query(
         collection(db, `organizations/${ORG_ID}/jobViews`),
@@ -184,7 +180,6 @@ export default function DashboardHome() {
       }
     );
 
-    // 応募
     const uB = onSnapshot(
       query(
         collection(db, `organizations/${ORG_ID}/applications`),
@@ -207,7 +202,6 @@ export default function DashboardHome() {
       }
     );
 
-    // リコログ投稿
     const uC = onSnapshot(
       query(
         collection(db, `organizations/${ORG_ID}/licologPosts`),
@@ -230,7 +224,6 @@ export default function DashboardHome() {
       }
     );
 
-    // リコログ公開
     const uD = onSnapshot(
       query(
         collection(db, `organizations/${ORG_ID}/events`),
@@ -307,30 +300,9 @@ export default function DashboardHome() {
               <Tooltip />
               <Legend />
               <Bar yAxisId="right" dataKey="views" name="求人ページ閲覧数" fill="#93c5fd" />
-              <Line
-                yAxisId="left"
-                type="monotone"
-                dataKey="apps"
-                name="応募数"
-                stroke="#0ea5e9"
-                dot={false}
-              />
-              <Line
-                yAxisId="left"
-                type="monotone"
-                dataKey="posts"
-                name="リコログ投稿数"
-                stroke="#22c55e"
-                dot={false}
-              />
-              <Line
-                yAxisId="left"
-                type="monotone"
-                dataKey="approved"
-                name="リコログ公開数"
-                stroke="#f43f5e"
-                dot={false}
-              />
+              <Line yAxisId="left" type="monotone" dataKey="apps" name="応募数" stroke="#0ea5e9" dot={false} />
+              <Line yAxisId="left" type="monotone" dataKey="posts" name="リコログ投稿数" stroke="#22c55e" dot={false} />
+              <Line yAxisId="left" type="monotone" dataKey="approved" name="リコログ公開数" stroke="#f43f5e" dot={false} />
             </ComposedChart>
           </ResponsiveContainer>
         </div>
@@ -344,17 +316,14 @@ export default function DashboardHome() {
         <KpiCard title="リコログ公開数" value={todayApproved} delta={pctDelta(todayApproved, ydayApproved)} />
       </div>
 
-      {/* 下段：2カラム（求人一覧 / リコログ一覧） */}
+      {/* 下段：2カラム */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         {/* 求人一覧 */}
         <section className="rounded-xl bg-white border border-black/5 p-4">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-base font-semibold">求人ページ一覧</h3>
-            <Link to="/jobs" className="text-sm text-sky-600 hover:underline">
-              求人ページはこちら
-            </Link>
+            <Link to="/jobs" className="text-sm text-sky-600 hover:underline">求人ページはこちら</Link>
           </div>
-
           {jobs.length === 0 ? (
             <div className="text-sm text-gray-500">まだ公開済みの求人はありません。</div>
           ) : (
@@ -362,34 +331,15 @@ export default function DashboardHome() {
               {jobs.map((j) => {
                 const publicPath = `/p/${ORG_ID}/jobs/${j.id}`;
                 return (
-                  <li
-                    key={j.id}
-                    className="rounded-xl border border-black/5 bg-white p-3 flex items-center gap-3"
-                  >
-                    <div className="w-[72px] h-[48px] rounded-lg bg-gray-100 text-[10px] text-gray-400 grid place-items-center">
-                      NO IMAGE
-                    </div>
+                  <li key={j.id} className="rounded-xl border border-black/5 bg-white p-3 flex items-center gap-3">
+                    <div className="w-[72px] h-[48px] rounded-lg bg-gray-100 text-[10px] text-gray-400 grid place-items-center">NO IMAGE</div>
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium truncate">{j.title || "(無題)"}</div>
-                      <div className="text-xs text-gray-500">
-                        {j.publishedAt?.toDate?.()?.toLocaleString?.() ?? ""}
-                      </div>
+                      <div className="text-xs text-gray-500">{j.publishedAt?.toDate?.()?.toLocaleString?.() ?? ""}</div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <button
-                        className="px-3 py-1 rounded-lg border hover:bg-black/5"
-                        onClick={() => navigate(publicPath)}
-                      >
-                        開く
-                      </button>
-                      <a
-                        className="px-3 py-1 rounded-lg border hover:bg-black/5"
-                        href={publicPath}
-                        target="_blank"
-                        rel="noopener"
-                      >
-                        新しいタブで
-                      </a>
+                      <button className="px-3 py-1 rounded-lg border hover:bg-black/5" onClick={() => navigate(publicPath)}>開く</button>
+                      <a className="px-3 py-1 rounded-lg border hover:bgブラック/5" href={publicPath} target="_blank" rel="noopener">新しいタブで</a>
                     </div>
                   </li>
                 );
@@ -402,9 +352,7 @@ export default function DashboardHome() {
         <section className="rounded-xl bg-white border border-black/5 p-4">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-base font-semibold">リコログ投稿一覧</h3>
-            <Link to="/licolog" className="text-sm text-sky-600 hover:underline">
-              リコログ一覧はこちら
-            </Link>
+            <Link to="/licolog" className="text-sm text-sky-600 hover:underline">リコログ一覧はこちら</Link>
           </div>
 
           {licologs.length === 0 ? (
@@ -412,21 +360,12 @@ export default function DashboardHome() {
           ) : (
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
               {licologs.map((p) => (
-                <article
-                  key={p.id}
-                  className="rounded-xl border border-black/5 bg-white p-3 flex flex-col"
-                >
-                  <div className="w-full h-[90px] rounded-lg bg-gray-100 text-[10px] text-gray-400 grid place-items-center">
-                    NO IMAGE
-                  </div>
-                  <div className="mt-2 text-xs text-gray-500">
-                    {p.createdAt?.toDate?.()?.toLocaleString?.() ?? ""}
-                  </div>
+                <article key={p.id} className="rounded-xl border borderブラック/5 bg-white p-3 flex flex-col">
+                  <div className="w-full h-[90px] rounded-lg bg-gray-100 text-[10px] text-gray-400 grid place-items-center">NO IMAGE</div>
+                  <div className="mt-2 text-xs text-gray-500">{p.createdAt?.toDate?.()?.toLocaleString?.() ?? ""}</div>
                   <div className="mt-1 text-sm line-clamp-2">{p.body}</div>
                   <div className="mt-auto pt-2">
-                    <span className="inline-block text-[11px] px-2 py-0.5 rounded-full bg-black/5">
-                      {p.status}
-                    </span>
+                    <span className="inline-block text-[11px] px-2 py-0.5 rounded-full bg-black/5">{p.status}</span>
                   </div>
                 </article>
               ))}
@@ -435,26 +374,20 @@ export default function DashboardHome() {
         </section>
       </div>
 
-      {/* フッター：お知らせ & コピーライト/ポリシー */}
+      {/* フッター */}
       <div className="rounded-xl border border-black/5 bg-[#111]/[0.02] px-4 py-3">
         <div className="text-[12px]">
           <span className="inline-block mr-2">【事務局からのお知らせ】</span>
           現在、最新版のリコペ ver1.0 です。リリースノートは
-          <a className="text-sky-600 hover:underline ml-1" href="#" onClick={(e)=>e.preventDefault()}>
-            こちら
-          </a>
+          <a className="text-sky-600 hover:underline ml-1" href="#" onClick={(e)=>e.preventDefault()}>こちら</a>
         </div>
       </div>
 
       <footer className="py-6 text-[12px] text-gray-500 flex items-center justify-between">
         <div>© GLOCALIZATION</div>
         <div className="space-x-4">
-          <a className="hover:underline" href="#" onClick={(e)=>e.preventDefault()}>
-            規約
-          </a>
-          <a className="hover:underline" href="#" onClick={(e)=>e.preventDefault()}>
-            ポリシー
-          </a>
+          <NavLink to="/legal/tokusho" className={nav}>特定商取引法に関する表記</NavLink>
+          <NavLink to="/legal/policy" className={nav}>ポリシー</NavLink>
         </div>
       </footer>
     </div>

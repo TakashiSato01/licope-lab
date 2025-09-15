@@ -1,24 +1,13 @@
 // apps/licolog/src/lib/repositories/licolog.ts
+import { auth, db, storage } from "../firebase";
+import { onAuthStateChanged } from "firebase/auth";
 import {
   addDoc, collection, doc, onSnapshot, orderBy, query, where,
   serverTimestamp, updateDoc, arrayUnion, arrayRemove, getDoc
 } from "firebase/firestore";
-import { auth, db, storage } from "../firebase";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
-
-export type LicologPostStatus = "pending" | "approved" | "hidden";
-export type LicologMedia = { path: string; width?: number; height?: number; bytes?: number };
-export type LicologPost = {
-  id?: string;
-  body: string;
-  media?: LicologMedia[];
-  authorUid: string;
-  orgId: string;
-  facilityId: string;
-  status: LicologPostStatus;
-  createdAt: any;
-  updatedAt: any;
-};
+import type { LicologStatus as LicologPostStatus, LicologMedia, LicologPost } from "../types/licolog";
+export type { LicologPost, LicologMedia, LicologStatus as LicologPostStatus } from "../types/licolog";
 
 const ORG_ID = "demo-org";
 const FACILITY_ID = "demo-facility";
@@ -105,26 +94,53 @@ export async function updateLicologPost(postId: string, {
 
 // ============== 購読 ==============
 export function subscribeOrgWall(cb: (posts: LicologPost[]) => void) {
-  const col = collection(db, `organizations/${ORG_ID}/licologPosts`);
-  const qy = query(col, where("orgId", "==", ORG_ID), orderBy("createdAt", "desc"));
-  return onSnapshot(qy, (snap) => {
-    cb(snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })));
-  });
+ let unsub: (() => void) | null = null;
+ const stopAuth = onAuthStateChanged(auth, () => {
+   if (unsub) { unsub(); unsub = null; }
+   const col = collection(db, `organizations/${ORG_ID}/licologPosts`);
+   const qy = query(
+     col,
+     where("orgId", "==", ORG_ID),
+     orderBy("createdAt", "desc"),
+   );
+   unsub = onSnapshot(
+     qy,
+     (snap) => {
+       const rows = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }));
+       console.debug("[OrgWall] rows:", rows.length, rows[0]);
+       cb(rows);
+     },
+     (err) => {
+       console.error("[subscribeOrgWall] onSnapshot error:", err);
+       cb([]);
+     }
+   );
+ });
+ return () => { if (unsub) unsub(); stopAuth(); };
 }
 
-export function subscribeMyPosts(cb: (posts: LicologPost[]) => void) {
-  const uid = auth.currentUser?.uid;
-  if (!uid) throw new Error("not signed in");
-  const col = collection(db, `organizations/${ORG_ID}/licologPosts`);
-  const qy = query(col,
-    where("orgId", "==", ORG_ID),
-    where("authorUid", "==", uid),
-    orderBy("createdAt", "desc"),
-  );
-  return onSnapshot(qy, (snap) => {
-    cb(snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })));
-  });
-}
+  export function subscribeMyPosts(cb: (posts: LicologPost[]) => void) {
+    let unsub: (() => void) | null = null;
+    const stopAuth = onAuthStateChanged(auth, (user) => {
+      // ユーザーが切り替わったら既存購読を解除
+      if (unsub) { unsub(); unsub = null; }
+      if (!user) { cb([]); return; }
+  
+      const col = collection(db, `organizations/${ORG_ID}/licologPosts`);
+      const qy = query(
+        col,
+        where("orgId", "==", ORG_ID),
+        where("authorUid", "==", user.uid),
+        orderBy("createdAt", "desc"),
+      );
+      unsub = onSnapshot(
+        qy,
+        (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }))),
+        (err) => console.error("[subscribeMyPosts] onSnapshot error:", err)
+      );
+    });
+    return () => { if (unsub) unsub(); stopAuth(); };
+  }
 
 // ダウンロードURL（表示側で使う）
 export async function pathToURL(path?: string | null): Promise<string | null> {
