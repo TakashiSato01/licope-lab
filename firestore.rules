@@ -16,6 +16,17 @@ service cloud.firestore {
       return signedIn() && roles.hasAny([roleOf(orgId)]);
     }
 
+    // News: ダッシュボード用（新しい順で読むだけ）
+    match /organizations/{orgId}/news/{newsId} {
+      allow read: if signedIn();   // 開発中は true でもOK
+      // 作成も入れるなら↓（任意）
+      allow create: if signedIn()
+        && request.resource.data.orgId == orgId
+        && isString(request.resource.data.title)
+        && request.resource.data.createdAt is timestamp;
+      allow update, delete: if false;
+    }
+
     /** テナント境界：全データは organizations/{orgId} 配下に置く前提 */
     match /organizations/{orgId} {
 

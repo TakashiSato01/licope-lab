@@ -15,6 +15,9 @@ import LicologPage from "./pages/LicologPage";
 import ApplicationsPage from "./pages/ApplicationsPage";
 import TokushoPage from "./pages/TokushoPage";
 import PolicyPage from "./pages/PolicyPage";
+import FaqPage from "./pages/FaqPage";
+import NewsPage from "./pages/NewsPage";
+
 
 // 公開配下（認証不要）
 import PublicJobPage from "./pages/public/PublicJobPage";
@@ -68,7 +71,8 @@ function App() {
           <Route path="jobs/new" element={<JobCreatePage />} />
           <Route path="licolog" element={<LicologPage />} />
           <Route path="applications" element={<ApplicationsPage />} />
-          {/* 法務ページを Outlet に出す */}
+          <Route path="news" element={<NewsPage />} />
+          <Route path="faq" element={<FaqPage />} />
           <Route path="legal/tokusho" element={<TokushoPage />} />
           <Route path="legal/policy" element={<PolicyPage />} />
         </Route>

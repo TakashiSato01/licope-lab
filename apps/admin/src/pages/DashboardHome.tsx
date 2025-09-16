@@ -21,10 +21,34 @@ import {
   Legend,
   CartesianGrid,
 } from "recharts";
+import { AlertCircle } from "lucide-react";
 
 const ORG_ID = "demo-org";
 
 /* ---------- 小ユーティリティ ---------- */
+// グラフ用カスタムドット
+function CircleDot({ cx, cy, stroke }: any) {
+  return <circle cx={cx} cy={cy} r={4} fill={stroke} stroke="#fff" strokeWidth={1.5} />;
+}
+function DiamondDot({ cx, cy, stroke }: any) {
+  const s = 4;
+  return (
+    <rect
+      x={cx - s}
+      y={cy - s}
+      width={s * 2}
+      height={s * 2}
+      fill={stroke}
+      transform={`rotate(45 ${cx} ${cy})`}
+      rx="1"
+      ry="1"
+    />
+  );
+}
+function HollowDot({ cx, cy, stroke }: any) {
+  return <circle cx={cx} cy={cy} r={4} fill="#fff" stroke={stroke} strokeWidth={2} />;
+}
+
 function startOfDay(d = new Date()) {
   const x = new Date(d);
   x.setHours(0, 0, 0, 0);
@@ -51,19 +75,118 @@ const nav = ({ isActive }: { isActive: boolean }) =>
   `hover:underline ${isActive ? "text-sky-600" : "text-gray-500"}`;
 
 /* ---------- 型 ---------- */
+
+type NewsItem = {
+  id: string;
+  title: string;
+  body?: string;
+  createdAt?: Timestamp;
+  level?: "info" | "update" | "alert";
+};
+
 type PublicJob = {
   id: string;
   title: string;
   publishedAt?: any;
 };
 
-type LicologPost = {
-  id: string;
-  body: string;
-  status: "pending" | "approved" | "hidden" | "internal";
-  facilityId?: string;
-  createdAt?: any;
+type LicologStatus = "pending" | "approved" | "hidden" | "internal";
+
+const STATUS_MAP: Record<LicologStatus, { label: string; chip: string }> = {
+  pending:  { label: "非公開",   chip: "bg-gray-100 text-gray-700" },
+  approved: { label: "公開済み", chip: "bg-emerald-100 text-emerald-700" },
+  hidden:   { label: "非表示",   chip: "bg-slate-200 text-slate-700" },
+  internal: { label: "社内限定", chip: "bg-amber-100 text-amber-700" },
 };
+
+function StatusChip({ status }: { status: LicologStatus }) {
+  const m = STATUS_MAP[status] ?? { label: String(status), chip: "bg-black/10" };
+  return (
+    <span className={`inline-block text-[11px] px-2 py-0.5 rounded-full ${m.chip}`}>
+      {m.label}
+    </span>
+  );
+}
+
+/* ---------- 最新お知らせバナー ---------- */
+function AnnouncementBanner({ orgId = ORG_ID }: { orgId?: string }) {
+  const [items, setItems] = useState<NewsItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const ref = collection(db, "organizations", orgId, "news");
+    const qq = query(ref, orderBy("createdAt", "desc"), limit(3));
+    const unsub = onSnapshot(qq, (snap) => {
+      setItems(snap.docs.map(d => ({ id: d.id, ...(d.data() as any) })));
+      setLoading(false);
+    });
+    return () => unsub();
+  }, [orgId]);
+
+  const latest = items[0];
+
+  // 骨
+  if (loading) {
+    return (
+      <div className="rounded-xl border border-black/10 bg-black/[0.02] px-4 py-3">
+        <div className="h-5 w-2/3 animate-pulse bg-black/10 rounded" />
+      </div>
+    );
+  }
+
+  // データなしなら既存文＋一覧リンク
+  if (!latest) {
+    return (
+      <div className="rounded-xl border border-black/10 bg-black/[0.02] px-4 py-3">
+        <div className="text-[12px]">
+          <span className="inline-block mr-2">【事務局からのお知らせ】</span>
+          現在、最新版のリコペ ver1.0 です。リリースノートは
+          <Link to="/news" className="text-sky-600 hover:underline ml-1">こちら</Link>
+        </div>
+      </div>
+    );
+  }
+
+  const chip =
+    latest.level === "alert" ? "bg-red-100 text-red-700" :
+    latest.level === "update" ? "bg-blue-100 text-blue-700" :
+    "bg-gray-100 text-gray-700";
+
+  return (
+    <Link
+      to={`/news#${latest.id}`}
+      className="group block rounded-xl border border-black/10 bg-white px-4 py-3 hover:shadow-sm hover:border-black/20 transition relative overflow-hidden"
+    >
+      {/* 左の薄いアクセント */}
+      <span className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-black/20 to-black/5" />
+
+      <div className="flex items-start gap-3">
+        <div className="mt-0.5 opacity-70"><AlertCircle size={18} /></div>
+        <div className="min-w-0 max-w-[720px]">
+          <div className="flex items-center gap-2">
+            <span className={`text-[11px] px-2 py-[2px] rounded-full ${chip}`}>
+              {latest.level === "alert" ? "重要" : latest.level === "update" ? "更新" : "お知らせ"}
+            </span>
+            {latest.createdAt?.toDate && (
+              <time className="text-[11px] text-gray-500">
+                {latest.createdAt.toDate().toLocaleDateString()}
+              </time>
+            )}
+          </div>
+  <div className="text-[13px] font-medium truncate break-words">
+    {latest.title}
+  </div>
+          {latest.body &&   <div className="text-[12px] text-gray-600 line-clamp-1 break-words">
+    {latest.body}
+  </div>}
+  <div className="text-[12px] text-sky-600 mt-0.5 underline-offset-2 group-hover:underline">
+    詳細を見る
+  </div>
+        </div>
+      </div>
+    </Link>
+  );
+}
 
 /* =========================
    メイン（ダッシュボード）
@@ -292,17 +415,43 @@ export default function DashboardHome() {
         </div>
         <div className="h-[260px]">
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={series}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
-              <XAxis dataKey="date" />
-              <YAxis yAxisId="left" allowDecimals={false} />
-              <YAxis yAxisId="right" orientation="right" allowDecimals={false} />
-              <Tooltip />
-              <Legend />
+<ComposedChart data={series}>
+  <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+  <XAxis dataKey="date" />
+  <YAxis yAxisId="left" allowDecimals={false} />
+  <YAxis yAxisId="right" orientation="right" allowDecimals={false} />
+  <Tooltip />
+  <Legend />
               <Bar yAxisId="right" dataKey="views" name="求人ページ閲覧数" fill="#93c5fd" />
-              <Line yAxisId="left" type="monotone" dataKey="apps" name="応募数" stroke="#0ea5e9" dot={false} />
-              <Line yAxisId="left" type="monotone" dataKey="posts" name="リコログ投稿数" stroke="#22c55e" dot={false} />
-              <Line yAxisId="left" type="monotone" dataKey="approved" name="リコログ公開数" stroke="#f43f5e" dot={false} />
+
+  {/* 左軸ライン3本にドットを付ける */}
+  <Line
+    yAxisId="left"
+    type="monotone"
+    dataKey="apps"
+    name="応募数"
+    stroke="#0ea5e9"
+    dot={<DiamondDot />}           // ひし形
+    activeDot={{ r: 6 }}           // ホバー時ちょい大きく
+  />
+  <Line
+    yAxisId="left"
+    type="monotone"
+    dataKey="posts"
+    name="リコログ投稿数"
+    stroke="#22c55e"
+    dot={<CircleDot />}            // 塗りつぶし丸
+    activeDot={{ r: 6 }}
+  />
+  <Line
+    yAxisId="left"
+    type="monotone"
+    dataKey="approved"
+    name="リコログ公開数"
+    stroke="#f43f5e"
+    dot={<HollowDot />}            // 白抜き丸
+    activeDot={{ r: 6 }}
+  />
             </ComposedChart>
           </ResponsiveContainer>
         </div>
@@ -339,7 +488,7 @@ export default function DashboardHome() {
                     </div>
                     <div className="flex items-center gap-2">
                       <button className="px-3 py-1 rounded-lg border hover:bg-black/5" onClick={() => navigate(publicPath)}>開く</button>
-                      <a className="px-3 py-1 rounded-lg border hover:bgブラック/5" href={publicPath} target="_blank" rel="noopener">新しいタブで</a>
+                      <a className="px-3 py-1 rounded-lg border hover:bg-black/5" href={publicPath} target="_blank" rel="noopener">新しいタブで</a>
                     </div>
                   </li>
                 );
@@ -360,12 +509,12 @@ export default function DashboardHome() {
           ) : (
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
               {licologs.map((p) => (
-                <article key={p.id} className="rounded-xl border borderブラック/5 bg-white p-3 flex flex-col">
+                <article key={p.id} className="rounded-xl border border-black/5 bg-white p-3 flex flex-col">
                   <div className="w-full h-[90px] rounded-lg bg-gray-100 text-[10px] text-gray-400 grid place-items-center">NO IMAGE</div>
                   <div className="mt-2 text-xs text-gray-500">{p.createdAt?.toDate?.()?.toLocaleString?.() ?? ""}</div>
                   <div className="mt-1 text-sm line-clamp-2">{p.body}</div>
                   <div className="mt-auto pt-2">
-                    <span className="inline-block text-[11px] px-2 py-0.5 rounded-full bg-black/5">{p.status}</span>
+                    <StatusChip status={p.status as LicologStatus} />
                   </div>
                 </article>
               ))}
@@ -374,14 +523,7 @@ export default function DashboardHome() {
         </section>
       </div>
 
-      {/* フッター */}
-      <div className="rounded-xl border border-black/5 bg-[#111]/[0.02] px-4 py-3">
-        <div className="text-[12px]">
-          <span className="inline-block mr-2">【事務局からのお知らせ】</span>
-          現在、最新版のリコペ ver1.0 です。リリースノートは
-          <a className="text-sky-600 hover:underline ml-1" href="#" onClick={(e)=>e.preventDefault()}>こちら</a>
-        </div>
-      </div>
+<AnnouncementBanner />
 
       <footer className="py-6 text-[12px] text-gray-500 flex items-center justify-between">
         <div>© GLOCALIZATION</div>

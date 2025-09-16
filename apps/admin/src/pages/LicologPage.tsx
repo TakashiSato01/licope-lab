@@ -24,6 +24,24 @@ function formatDate(ts?: any) {
   }
 }
 
+type LicologStatus = "pending" | "approved" | "hidden" | "internal";
+
+const STATUS_MAP: Record<LicologStatus, { label: string; chip: string }> = {
+  pending:  { label: "非公開",   chip: "bg-gray-100 text-gray-700" },
+  approved: { label: "公開済み", chip: "bg-emerald-100 text-emerald-700" },
+  hidden:   { label: "非表示",   chip: "bg-slate-200 text-slate-700" },
+  internal: { label: "社内限定", chip: "bg-amber-100 text-amber-700" },
+};
+
+function StatusChip({ status }: { status: LicologStatus }) {
+  const m = STATUS_MAP[status] ?? { label: String(status), chip: "bg-black/10" };
+  return (
+    <span className={`inline-block text-[11px] px-2 py-0.5 rounded-full ${m.chip}`}>
+      {m.label}
+    </span>
+  );
+}
+
 export default function LicologPage() {
   // 承認待ち
   const [pending, setPending] = useState<AdminLicologPost[]>([]);
@@ -97,32 +115,36 @@ export default function LicologPage() {
         </label>
 
         {/* リスト */}
-        <div className="space-y-3">
-          {pending.length === 0 && (
-            <div className="text-gray-500">承認待ちのリコログはありません。</div>
-          )}
-          {pending.map((p) => (
-            <label
-              key={p.id}
-              className="flex gap-3 items-start rounded-lg border border-gray-200 p-3 bg-white"
-            >
-              <input
-                type="checkbox"
-                className="mt-1"
-                checked={!!checked[p.id]}
-                onChange={(e) =>
-                  setChecked((prev) => ({ ...prev, [p.id]: e.target.checked }))
-                }
-              />
-              <div className="flex-1">
-                <div className="text-xs text-gray-500 mb-1">
-                  pending ・ {p.facilityId ?? "-"} ・ {formatDate(p.createdAt)}
-                </div>
-                <div className="whitespace-pre-wrap">{p.body}</div>
-              </div>
-            </label>
-          ))}
+<div className="space-y-3">
+  {pending.length === 0 && (
+    <div className="text-gray-500">承認待ちのリコログはありません。</div>
+  )}
+
+  {pending.map((p) => (
+    <label
+      key={p.id}
+      className="flex items-start gap-3 rounded-lg border border-gray-200 p-3 bg-white"
+    >
+      <input
+        type="checkbox"
+        className="mt-1"
+        checked={!!checked[p.id]}
+        onChange={(e) =>
+          setChecked((prev) => ({ ...prev, [p.id]: e.target.checked }))
+        }
+      />
+
+      <div className="flex-1">
+        <div className="flex items-center gap-2 text-xs text-gray-500 mb-1">
+          <StatusChip status={p.status as LicologStatus} />
+          <span>{p.facilityId ?? "-"}</span>
+          <span>・{formatDate(p.createdAt)}</span>
         </div>
+        <div className="whitespace-pre-wrap">{p.body}</div>
+      </div>
+    </label>
+  ))}
+</div>
 
         {/* 公開ボタン */}
         <div className="mt-5">
