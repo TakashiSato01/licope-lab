@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
+// apps/admin/src/pages/public/PublicJobPage.tsx
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
   collection,
@@ -11,11 +12,11 @@ import {
   where,
   FirestoreError,
 } from "firebase/firestore";
-import { db, storage, functions } from "@/lib/firebase";
-import { getBytes, ref } from "firebase/storage";
-import { httpsCallable } from "firebase/functions";
+import { db, storage } from "@/lib/firebase";
+import { getBytes, getDownloadURL, ref } from "firebase/storage";
+import { recordJobView } from "@/lib/repositories/jobs";
 
-// --- types（既存構造を踏襲） ---
+/* ---------- types ---------- */
 type JobSnapshot = {
   orgId: string;
   title: string;
@@ -23,6 +24,9 @@ type JobSnapshot = {
   description: string;
   version: number;
   generatedAt: number;
+  // 追加（JSONに入っている可能性がある）
+  thumbnailURL?: string | null;
+  thumbnailPath?: string | null;
 };
 
 type LicologPost = {
@@ -33,24 +37,26 @@ type LicologPost = {
   createdAt?: any;
 };
 
+/* ========== Component ========== */
 export default function PublicJobPage() {
-  // ルート param 名のブレを全部吸収（orgId|org、pubId|jobId|id）
+  // ルート param の表記ゆれを吸収
   const params = useParams();
   const orgId = (params.orgId || (params as any).org || "demo-org") as string;
   const pubId = (params.pubId || (params as any).jobId || (params as any).id || "") as string;
 
   const [loading, setLoading] = useState(true);
   const [job, setJob] = useState<JobSnapshot | null>(null);
+  const [thumbURL, setThumbURL] = useState<string | null>(null);
   const [licologs, setLicologs] = useState<LicologPost[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [licologNote, setLicologNote] = useState<string | null>(null); // インデックス等の補足を表示
+  const [licologNote, setLicologNote] = useState<string | null>(null);
 
-  // Firestore の公開メタ（偶数セグメント）
   const pubDocRef = useMemo(
     () => doc(db, `organizations/${orgId}/publicJobs/${pubId}`),
     [orgId, pubId]
   );
 
+  // 読み込み（Firestoreメタ → Storage JSON）
   useEffect(() => {
     if (!pubId) {
       setError("URL が不正です（pubId がありません）");
@@ -58,92 +64,97 @@ export default function PublicJobPage() {
       return;
     }
 
-    let unsubLicolog: (() => void) | undefined;
+    let unmounted = false;
 
     (async () => {
       try {
         setLoading(true);
         setError(null);
-        setLicologNote(null);
 
-        // 1) Firestore から公開メタを取得
+        // 1) Firestore メタ
         const metaSnap = await getDoc(pubDocRef);
-        if (!metaSnap.exists()) {
-          throw new Error("公開データが見つかりませんでした。");
-        }
-        const meta = metaSnap.data() as {
-          storagePath?: string;
-          title?: string;
-          wage?: string;
-          description?: string;
-        };
+        if (!metaSnap.exists()) throw new Error("公開データが見つかりませんでした。");
+        const meta = metaSnap.data() as Partial<JobSnapshot> & { storagePath?: string };
+        if (!meta.storagePath) throw new Error("storagePath が設定されていません。");
 
-        if (!meta.storagePath) {
-          throw new Error("公開用ファイルのパス(storagePath)が設定されていません。");
-        }
-
-        // 2) Storage のスナップショット JSON を読む（不変の公開データ）
+        // 2) Storage の JSON（公開スナップショット）
         const bytes = await getBytes(ref(storage, meta.storagePath));
         const json = new TextDecoder().decode(bytes);
         const parsed = JSON.parse(json) as JobSnapshot;
 
-        // Firestore 側により新しい値が入っている可能性もあるので軽く補正
-        setJob({
+        if (unmounted) return;
+
+        // Firestoreに入っている値で足りない所を補正
+        const merged: JobSnapshot = {
           ...parsed,
           title: parsed.title || meta.title || "(無題)",
-          wage: parsed.wage || meta.wage || "",
-          description: parsed.description || meta.description || "",
-        });
+          wage: parsed.wage || (meta as any).wage || "",
+          description: parsed.description || (meta as any).description || "",
+          thumbnailURL: parsed.thumbnailURL ?? meta.thumbnailURL ?? null,
+          thumbnailPath: parsed.thumbnailPath ?? meta.thumbnailPath ?? null,
+        };
+        setJob(merged);
 
-        // 2.5) ページビュー計測（失敗は無視）
-        try {
-          const track = httpsCallable(functions, "trackPublicJobView");
-          void track({ orgId, pubId });
-        } catch {
-          /* noop */
+        // 3) サムネ解決（URL優先 → Storage path）
+        if (merged.thumbnailURL) setThumbURL(merged.thumbnailURL);
+        else if (merged.thumbnailPath) {
+          getDownloadURL(ref(storage, merged.thumbnailPath))
+            .then((u) => !unmounted && setThumbURL(u))
+            .catch(() => !unmounted && setThumbURL(null));
+        } else {
+          setThumbURL(null);
         }
-
-        // 3) リコログ：approved の最新3件をライブ購読
-        const licologCol = collection(db, `organizations/${orgId}/licologPosts`);
-        const qy = query(
-          licologCol,
-          where("orgId", "==", orgId),
-          where("status", "==", "approved"),
-          orderBy("createdAt", "desc"),
-          limit(3)
-        );
-        unsubLicolog = onSnapshot(
-          qy,
-          (snap) => {
-            const rows = snap.docs.map(
-              (d) => ({ id: d.id, ...(d.data() as any) }) as LicologPost
-            );
-            setLicologs(rows);
-          },
-          (e: FirestoreError) => {
-            console.error("[PublicJobPage] licolog onSnapshot error:", e);
-            setLicologs([]);
-            // インデックス未作成のときはヒントを画面に出す
-            if (e.code === "failed-precondition") {
-              setLicologNote(
-                "リコログの並び替えに必要な複合インデックスが未作成です。" +
-                "firestore.indexes.json に licologPosts の {orgId ASC, status ASC, createdAt DESC} を追加してデプロイしてください。"
-              );
-            }
-          }
-        );
       } catch (e: any) {
         console.error("[PublicJobPage] load error:", e);
-        setError(e?.message ?? String(e));
+        if (!unmounted) setError(e?.message ?? String(e));
       } finally {
-        setLoading(false);
+        if (!unmounted) setLoading(false);
       }
     })();
 
-    return () => { if (unsubLicolog) unsubLicolog(); };
-  }, [pubDocRef, orgId, pubId]); // ← 重複を除去
+    return () => {
+      unmounted = true;
+    };
+  }, [pubDocRef, orgId, pubId]);
 
-  // ====== 既存レイアウトを維持 ======
+  // ページビュー記録（StrictModeの二重実行対策付き）
+  const fired = useRef(false);
+  useEffect(() => {
+    if (!pubId || fired.current) return;
+    fired.current = true;
+    recordJobView(pubId, { orgId, referrer: document.referrer }).catch(() => {});
+  }, [orgId, pubId]);
+
+  // リコログ（approved 最新3件）
+  useEffect(() => {
+    const licologCol = collection(db, `organizations/${orgId}/licologPosts`);
+    const qy = query(
+      licologCol,
+      where("orgId", "==", orgId),
+      where("status", "==", "approved"),
+      orderBy("createdAt", "desc"),
+      limit(3)
+    );
+    const unsub = onSnapshot(
+      qy,
+      (snap) => {
+        setLicologs(snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })));
+      },
+      (e: FirestoreError) => {
+        console.error("[PublicJobPage] licolog onSnapshot error:", e);
+        setLicologs([]);
+        if (e.code === "failed-precondition") {
+          setLicologNote(
+            "リコログの並び替えに必要な複合インデックスが未作成です。" +
+              "firestore.indexes.json に licologPosts の {orgId ASC, status ASC, createdAt DESC} を追加してデプロイしてください。"
+          );
+        }
+      }
+    );
+    return () => unsub();
+  }, [orgId]);
+
+  /* ---------- UI（既存レイアウトを維持） ---------- */
   if (loading) return <div className="p-6">読み込み中…</div>;
 
   if (error) {
@@ -161,6 +172,11 @@ export default function PublicJobPage() {
 
   return (
     <div className="p-6 max-w-4xl">
+      {/* サムネ（オプション） */}
+      {thumbURL ? (
+        <img src={thumbURL} alt="" className="w-full h-48 object-cover rounded-lg mb-4" />
+      ) : null}
+
       {/* 求人ヘッダ */}
       <h1 className="text-2xl font-bold mb-2">{job.title}</h1>
       <div className="text-gray-400 mb-6">給与：{job.wage || "-"}</div>
@@ -184,7 +200,7 @@ export default function PublicJobPage() {
         <div className="text-lg font-semibold mb-3">最新のリコログ</div>
 
         {licologNote && (
-          <div className="mb-3 text-xs text-yellow-300/80">
+          <div className="mb-3 text-xs text-yellow-700">
             {licologNote}
           </div>
         )}

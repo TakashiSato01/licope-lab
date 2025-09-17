@@ -119,6 +119,16 @@ service cloud.firestore {
         allow read:  if hasAnyRole(orgId, ['owner','admin','editor','staff','viewer']);
         allow write: if false;
       }
+      match /databases/{db}/documents {
+  match /organizations/{orgId}/jobViews/{docId} {
+    allow create: if true;            // 開発中は緩めで
+    allow read: if request.auth != null;
+  }
+}
+    }
+match /organizations/{orgId}/jobViews/{docId} {
+      allow create: if true;                 // 開発中は緩く
+      allow read: if request.auth != null;   // 管理画面から読む
     }
   }
 }

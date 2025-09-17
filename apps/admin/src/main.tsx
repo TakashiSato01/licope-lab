@@ -11,6 +11,7 @@ import Dashboard from "./pages/Dashboard";
 import DashboardHome from "./pages/DashboardHome";
 import JobsPage from "./pages/JobsPage";
 import JobCreatePage from "./pages/jobs/JobCreatePage";
+import JobEditPage from "./pages/jobs/JobEditPage";
 import LicologPage from "./pages/LicologPage";
 import ApplicationsPage from "./pages/ApplicationsPage";
 import TokushoPage from "./pages/TokushoPage";
@@ -69,6 +70,7 @@ function App() {
           <Route index element={<DashboardHome />} />
           <Route path="jobs" element={<JobsPage />} />
           <Route path="jobs/new" element={<JobCreatePage />} />
+          <Route path="jobs/:id/edit" element={<JobEditPage />} />
           <Route path="licolog" element={<LicologPage />} />
           <Route path="applications" element={<ApplicationsPage />} />
           <Route path="news" element={<NewsPage />} />

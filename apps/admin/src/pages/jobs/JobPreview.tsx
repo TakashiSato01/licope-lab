@@ -1,20 +1,42 @@
+// apps/admin/src/pages/jobs/JobPreview.tsx
 import React from "react";
-import type { JobDraft } from "./JobForm";
 
-export default function JobPreview({ form }: { form: JobDraft }) {
-  const f = form ?? { title: "", wage: "", description: "" };
+export default function JobPreview(props: {
+  title: string;
+  wage: string;
+  description: string;
+  thumbnailURL: string | null;
+}) {
   return (
-    <div>
-      <div className="text-sm text-gray-500 mb-2">（プレビュー）</div>
-      <h3 className="text-xl font-bold mb-2">
-        {f.title || "（タイトル未入力）"}
-      </h3>
-      <div className="mb-2">
-        <span className="text-sm font-medium">給与：</span>
-        <span>{f.wage || "（給与未入力）"}</span>
+    <div className="space-y-4">
+      {/* サムネイル */}
+      <div className="w-full h-40 rounded-xl overflow-hidden border border-black/10 bg-gray-50 grid place-items-center">
+        {props.thumbnailURL ? (
+          <img src={props.thumbnailURL} alt="" className="w-full h-full object-cover" />
+        ) : (
+          <span className="text-gray-400 text-sm">NO IMAGE</span>
+        )}
       </div>
-      <div className="text-sm whitespace-pre-wrap">
-        {f.description || "（仕事内容の説明がここに表示されます）"}
+
+      {/* タイトル */}
+      <h2 className="text-xl font-semibold">
+        {props.title || "（タイトル未入力）"}
+      </h2>
+
+      {/* 給与 */}
+      <div className="text-pink-600 font-medium">
+        {props.wage || "（給与未入力）"}
+      </div>
+
+      {/* 説明 */}
+      <div className="prose prose-sm max-w-none">
+        {props.description ? (
+          <pre className="whitespace-pre-wrap font-sans text-[15px] leading-relaxed">
+            {props.description}
+          </pre>
+        ) : (
+          <div className="text-gray-500">説明が未入力です。</div>
+        )}
       </div>
     </div>
   );

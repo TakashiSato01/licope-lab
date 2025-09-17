@@ -43,8 +43,8 @@ function DiamondDot({ cx, cy, stroke }: any) {
       transform={`rotate(45 ${cx} ${cy})`}
       rx="1"
       ry="1"
-      />
-      );
+    />
+  );
 }
 function HollowDot({ cx, cy, stroke }: any) {
   return <circle cx={cx} cy={cy} r={4} fill="#fff" stroke={stroke} strokeWidth={2} />;
@@ -80,6 +80,8 @@ type PublicJob = {
   id: string;
   title: string;
   publishedAt?: any;
+  thumbnailPath?: string | null;
+  thumbnailURL?: string | null;
 };
 
 type LicologMedia = {
@@ -116,39 +118,45 @@ function StatusChip({ status }: { status: LicologStatus }) {
   );
 }
 
-/* ---------- サムネ（共通） ---------- */
+/* ---------- サムネ（URL優先 → Storage path フォールバック） ---------- */
 function Thumb({
+  url,
   path,
   className,
 }: {
+  url?: string | null;
   path?: string | null;
   className?: string;
 }) {
-  const [url, setUrl] = useState<string | null>(null);
+  const [resolved, setResolved] = useState<string | null>(url ?? null);
 
   useEffect(() => {
     let dead = false;
+    if (url) {
+      setResolved(url);
+      return;
+    }
     if (!path) {
-      setUrl(null);
+      setResolved(null);
       return;
     }
     getDownloadURL(ref(storage, path))
       .then((u) => {
-        if (!dead) setUrl(u);
+        if (!dead) setResolved(u);
       })
       .catch(() => {
-        if (!dead) setUrl(null);
+        if (!dead) setResolved(null);
       });
     return () => {
       dead = true;
     };
-  }, [path]);
+  }, [url, path]);
 
   const root = className ?? "w-full h-[90px] rounded-lg";
   return (
     <div className={`${root} overflow-hidden`}>
-      {url ? (
-        <img src={url} alt="" className="w-full h-full object-cover" />
+      {resolved ? (
+        <img src={resolved} alt="" className="w-full h-full object-cover" />
       ) : (
         <div className="w-full h-full grid place-items-center bg-gray-100 text-[10px] text-gray-400">
           NO IMAGE
@@ -189,16 +197,16 @@ export default function DashboardHome() {
 
   /* ---------- KPI 監視 ---------- */
   useEffect(() => {
-    // 閲覧数（jobViews）
-    const qViewsToday = query(
-      collection(db, `organizations/${ORG_ID}/jobViews`),
-      where("viewedAt", ">=", Timestamp.fromDate(today0))
-    );
-    const qViewsYday = query(
-      collection(db, `organizations/${ORG_ID}/jobViews`),
-      where("viewedAt", ">=", Timestamp.fromDate(yday0)),
-      where("viewedAt", "<", Timestamp.fromDate(today0))
-    );
+// 今日
+const qViewsToday = query(
+  collection(db, `organizations/${ORG_ID}/jobViews`),
+  where("viewedAtMs", ">=", today0.getTime())
+);
+const qViewsYday = query(
+  collection(db, `organizations/${ORG_ID}/jobViews`),
+  where("viewedAtMs", ">=", yday0.getTime()),
+  where("viewedAtMs", "<",  today0.getTime())
+);
     const u1 = onSnapshot(qViewsToday, (s) => setTodayViews(s.size));
     const u2 = onSnapshot(qViewsYday, (s) => setYdayViews(s.size));
 
@@ -246,9 +254,7 @@ export default function DashboardHome() {
     return () => [u1, u2, u3, u4, u5, u6, u7, u8].forEach((u) => u());
   }, [today0, yday0]);
 
-  /* ---------- 合同グラフ（7日） ---------- */
   useEffect(() => {
-    // 7日分の土台
     const days: { key: string; from: Date; to: Date }[] = [];
     for (let i = 6; i >= 0; i--) {
       const d0 = startOfDay(addDays(new Date(), -i));
@@ -264,7 +270,7 @@ export default function DashboardHome() {
     }));
     setSeries(base);
 
-    // 閲覧数（右軸棒）
+
     const uA = onSnapshot(
       query(
         collection(db, `organizations/${ORG_ID}/jobViews`),
@@ -418,127 +424,67 @@ export default function DashboardHome() {
               <Tooltip />
               <Legend />
               <Bar yAxisId="right" dataKey="views" name="求人ページ閲覧数" fill="#93c5fd" />
-
-  {/* 左軸ライン3本にドットを付ける */}
-              <Line
-                yAxisId="left"
-                type="monotone"
-                dataKey="apps"
-                name="応募数"
-                stroke="#0ea5e9"
-    dot={<HollowDot />}           // ひし形
-    activeDot={{ r: 6 }}           // ホバー時ちょい大きく
-  />
-  <Line
-    yAxisId="left"
-    type="monotone"
-    dataKey="posts"
-    name="リコログ投稿数"
-    stroke="#22c55e"
-    dot={<CircleDot />}            // 塗りつぶし丸
-    activeDot={{ r: 6 }}
-  />
-  <Line
-    yAxisId="left"
-    type="monotone"
-    dataKey="approved"
-    name="リコログ公開数"
-    stroke="#f43f5e"
-    dot={<HollowDot />}            // 白抜き丸
-    activeDot={{ r: 6 }}
-  />
-</ComposedChart>
+              <Line yAxisId="left" type="monotone" dataKey="apps" name="応募数" stroke="#0ea5e9" dot={<HollowDot />} activeDot={{ r: 6 }} />
+              <Line yAxisId="left" type="monotone" dataKey="posts" name="リコログ投稿数" stroke="#22c55e" dot={<CircleDot />} activeDot={{ r: 6 }} />
+              <Line yAxisId="left" type="monotone" dataKey="approved" name="リコログ公開数" stroke="#f43f5e" dot={<DiamondDot />} activeDot={{ r: 6 }} />
+            </ComposedChart>
           </ResponsiveContainer>
         </div>
       </div>
 
       {/* KPI 4枚 */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <KpiCard
-          title="求人ページ閲覧数"
-          value={todayViews}
-          delta={pctDelta(todayViews, ydayViews)}
-        />
-        <KpiCard
-          title="応募数"
-          value={todayApps}
-          delta={pctDelta(todayApps, ydayApps)}
-        />
-        <KpiCard
-          title="リコログ投稿数"
-          value={todayPosts}
-          delta={pctDelta(todayPosts, ydayPosts)}
-        />
-        <KpiCard
-          title="リコログ公開数"
-          value={todayApproved}
-          delta={pctDelta(todayApproved, ydayApproved)}
-        />
+        <KpiCard title="求人ページ閲覧数" value={todayViews} delta={pctDelta(todayViews, ydayViews)} />
+        <KpiCard title="応募数" value={todayApps} delta={pctDelta(todayApps, ydayApps)} />
+        <KpiCard title="リコログ投稿数" value={todayPosts} delta={pctDelta(todayPosts, ydayPosts)} />
+        <KpiCard title="リコログ公開数" value={todayApproved} delta={pctDelta(todayApproved, ydayApproved)} />
       </div>
 
       {/* 下段：2カラム（求人一覧 / リコログ一覧） */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        {/* 求人一覧 */}
+        {/* 求人一覧（サムネ対応） */}
         <section className="rounded-xl bg-white border border-black/5 p-4">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-base font-semibold">求人ページ一覧</h3>
-            <Link to="/jobs" className="text-sm text-sky-600 hover:underline">
-              求人ページはこちら
-            </Link>
+            <Link to="/jobs" className="text-sm text-sky-600 hover:underline">求人ページはこちら</Link>
           </div>
 
           {jobs.length === 0 ? (
             <div className="text-sm text-gray-500">まだ公開済みの求人はありません。</div>
           ) : (
             <ul className="space-y-3">
-              {jobs.map((j) => {
-                const publicPath = `/p/${ORG_ID}/jobs/${j.id}`;
-                return (
-                  <li
-                    key={j.id}
-                    className="rounded-xl border border-black/5 bg-white p-3 flex items-center gap-3"
-                  >
-                    <div className="w-[72px] h-[48px] rounded-lg bg-gray-100 text-[10px] text-gray-400 grid place-items-center">
-                      NO IMAGE
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium truncate">
-                        {j.title || "(無題)"}
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {j.publishedAt?.toDate?.()?.toLocaleString?.() ?? ""}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        className="px-3 py-1 rounded-lg border hover:bg-black/5"
-                        onClick={() => navigate(publicPath)}
-                      >
-                        開く
-                      </button>
-                      <a
-                        className="px-3 py-1 rounded-lg border hover:bg-black/5"
-                        href={publicPath}
-                        target="_blank"
-                        rel="noopener"
-                      >
-                        新しいタブで
-                      </a>
-                    </div>
-                  </li>
-                );
-              })}
+{jobs.map((j) => {
+  const publicPath = `/p/${ORG_ID}/jobs/${j.id}`;
+  const editPath = `/jobs/${j.id}/edit`;
+  return (
+    <li key={j.id} className="rounded-xl border border-black/5 bg-white p-3 flex items-center gap-3">
+      <Thumb url={j.thumbnailURL ?? null} path={j.thumbnailPath ?? null} className="w-[72px] h-[48px] rounded-lg" />
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-medium truncate">{j.title || "(無題)"}</div>
+        <div className="text-xs text-gray-500">
+          {j.publishedAt?.toDate?.()?.toLocaleString?.() ?? ""}
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <button className="px-3 py-1 rounded-lg border hover:bg-black/5" onClick={() => navigate(editPath)}>
+          編集
+        </button>
+        <a className="px-3 py-1 rounded-lg border hover:bg-black/5" href={publicPath} target="_blank" rel="noopener">
+          開く
+        </a>
+      </div>
+    </li>
+  );
+})}
             </ul>
           )}
         </section>
 
-        {/* リコログ一覧 */}
-        <section className="rounded-xl bg白 border border-black/5 p-4 bg-white">
+        {/* リコログ一覧（1枚目サムネ） */}
+        <section className="rounded-xl bg-white border border-black/5 p-4">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-base font-semibold">リコログ投稿一覧</h3>
-            <Link to="/licolog" className="text-sm text-sky-600 hover:underline">
-              リコログ一覧はこちら
-            </Link>
+            <Link to="/licolog" className="text-sm text-sky-600 hover:underline">リコログ一覧はこちら</Link>
           </div>
 
           {licologs.length === 0 ? (
@@ -546,20 +492,14 @@ export default function DashboardHome() {
           ) : (
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
               {licologs.map((p) => (
-                <article
-                  key={p.id}
-                  className="rounded-xl border border-black/5 bg-white p-3 flex flex-col"
-                >
-                  <Thumb
-                    path={p.media?.[0]?.path ?? null}
-                    className="w-full h-[90px] rounded-lg object-cover"
-                  />
+                <article key={p.id} className="rounded-xl border border-black/5 bg-white p-3 flex flex-col">
+                  <Thumb path={p.media?.[0]?.path ?? null} className="w-full h-[90px] rounded-lg" />
                   <div className="mt-2 text-xs text-gray-500">
                     {p.createdAt?.toDate?.()?.toLocaleString?.() ?? ""}
                   </div>
                   <div className="mt-1 text-sm line-clamp-2">{p.body}</div>
                   <div className="mt-auto pt-2">
-<StatusChip status={p.status as LicologStatus} />
+                    <StatusChip status={p.status as LicologStatus} />
                   </div>
                 </article>
               ))}
@@ -573,25 +513,15 @@ export default function DashboardHome() {
         <div className="text-[12px]">
           <span className="inline-block mr-2">【事務局からのお知らせ】</span>
           現在、最新版のリコペ ver1.0 です。リリースノートは
-          <a
-            className="text-sky-600 hover:underline ml-1"
-            href="#"
-            onClick={(e) => e.preventDefault()}
-          >
-            こちら
-          </a>
+          <a className="text-sky-600 hover:underline ml-1" href="#" onClick={(e)=>e.preventDefault()}>こちら</a>
         </div>
       </div>
 
       <footer className="py-6 text-[12px] text-gray-500 flex items-center justify-between">
         <div>© GLOCALIZATION</div>
         <div className="space-x-4">
-          <NavLink to="/legal/tokusho" className={nav}>
-            特定商取引法に関する表記
-          </NavLink>
-          <NavLink to="/legal/policy" className={nav}>
-            ポリシー
-          </NavLink>
+          <NavLink to="/legal/tokusho" className={nav}>特定商取引法に関する表記</NavLink>
+          <NavLink to="/legal/policy" className={nav}>ポリシー</NavLink>
         </div>
       </footer>
     </div>
@@ -599,21 +529,11 @@ export default function DashboardHome() {
 }
 
 /* ---------- サブ：KPI カード ---------- */
-function KpiCard({
-  title,
-  value,
-  delta,
-}: {
-  title: string;
-  value: number;
-  delta: number;
-}) {
+function KpiCard({ title, value, delta }: { title: string; value: number; delta: number }) {
   return (
     <div className="rounded-xl bg-white border border-black/5 p-4">
       <div className="text-sm text-gray-500">{title}</div>
-      <div className="mt-2 text-2xl font-semibold">
-        {value.toLocaleString()}
-      </div>
+      <div className="mt-2 text-2xl font-semibold">{value.toLocaleString()}</div>
       <div className={`mt-1 text-xs ${deltaColor(delta)}`}>
         {delta >= 0 ? "+" : ""}
         {delta}%（前日比）
