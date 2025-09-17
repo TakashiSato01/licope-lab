@@ -1,4 +1,3 @@
-// apps/admin/src/pages/LicologPage.tsx
 import React, { useEffect, useMemo, useState } from "react";
 import {
   AdminLicologPost,
@@ -7,6 +6,9 @@ import {
   subscribeLicologApprovalEvents,
   subscribePendingLicologPosts,
 } from "@/lib/repositories/licolog";
+import { db, storage } from "@/lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
+import { getDownloadURL, ref } from "firebase/storage";
 
 function formatDate(ts?: any) {
   try {
@@ -24,23 +26,46 @@ function formatDate(ts?: any) {
   }
 }
 
-type LicologStatus = "pending" | "approved" | "hidden" | "internal";
+function SmallThumb({
+  path,
+  className,
+}: {
+  path?: string | null;
+  className?: string;
+}) {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let dead = false;
+    if (!path) {
+      setUrl(null);
+      return;
+    }
+    getDownloadURL(ref(storage, path))
+      .then((u) => {
+        if (!dead) setUrl(u);
+      })
+      .catch(() => {
+        if (!dead) setUrl(null);
+      });
+    return () => {
+      dead = true;
+    };
+  }, [path]);
 
-const STATUS_MAP: Record<LicologStatus, { label: string; chip: string }> = {
-  pending:  { label: "非公開",   chip: "bg-gray-100 text-gray-700" },
-  approved: { label: "公開済み", chip: "bg-emerald-100 text-emerald-700" },
-  hidden:   { label: "非表示",   chip: "bg-slate-200 text-slate-700" },
-  internal: { label: "社内限定", chip: "bg-amber-100 text-amber-700" },
-};
-
-function StatusChip({ status }: { status: LicologStatus }) {
-  const m = STATUS_MAP[status] ?? { label: String(status), chip: "bg-black/10" };
+  const root = className ?? "w-24 h-20 py-1 rounded-lg";
   return (
-    <span className={`inline-block text-[11px] px-2 py-0.5 rounded-full ${m.chip}`}>
-      {m.label}
-    </span>
+    <div className={`${root} overflow-hidden`}>
+      {url ? (
+        <img src={url} alt="" className="w-full h-full object-cover" />
+      ) : (
+        <div className="w-full h-17 grid place-items-center bg-gray-100 text-[10px] text-gray-400">
+          NO IMAGE
+        </div>
+      )}
+    </div>
   );
 }
+
 
 export default function LicologPage() {
   // 承認待ち
@@ -49,6 +74,7 @@ export default function LicologPage() {
 
   // 承認履歴
   const [history, setHistory] = useState<LicologApprovalEvent[]>([]);
+  const [postBodies, setPostBodies] = useState<Record<string, string>>({});
 
   // 初期購読
   useEffect(() => {
@@ -59,6 +85,31 @@ export default function LicologPage() {
       unsub2?.();
     };
   }, []);
+
+  // 履歴に出ている postId の本文を遅延取得してキャッシュ
+  useEffect(() => {
+    const missing = history
+      .map((h) => h.postId)
+      .filter((id) => !postBodies[id]);
+    if (!missing.length) return;
+
+    (async () => {
+      const entries: Record<string, string> = {};
+      for (const id of missing) {
+        try {
+          const snap = await getDoc(
+            doc(db, `organizations/demo-org/licologPosts/${id}`)
+          );
+          const body = (snap.data()?.body as string | undefined) ?? "";
+          entries[id] = body;
+        } catch {
+          // ignore
+        }
+      }
+      if (Object.keys(entries).length)
+        setPostBodies((prev) => ({ ...prev, ...entries }));
+    })();
+  }, [history, postBodies]);
 
   // チェック総数
   const selectedIds = useMemo(
@@ -115,36 +166,35 @@ export default function LicologPage() {
         </label>
 
         {/* リスト */}
-<div className="space-y-3">
-  {pending.length === 0 && (
-    <div className="text-gray-500">承認待ちのリコログはありません。</div>
-  )}
-
-  {pending.map((p) => (
-    <label
-      key={p.id}
-      className="flex items-start gap-3 rounded-lg border border-gray-200 p-3 bg-white"
-    >
-      <input
-        type="checkbox"
-        className="mt-1"
-        checked={!!checked[p.id]}
-        onChange={(e) =>
-          setChecked((prev) => ({ ...prev, [p.id]: e.target.checked }))
-        }
-      />
-
-      <div className="flex-1">
-        <div className="flex items-center gap-2 text-xs text-gray-500 mb-1">
-          <StatusChip status={p.status as LicologStatus} />
-          <span>{p.facilityId ?? "-"}</span>
-          <span>・{formatDate(p.createdAt)}</span>
+        <div className="space-y-3">
+          {pending.length === 0 && (
+            <div className="text-gray-500">承認待ちのリコログはありません。</div>
+          )}
+          {pending.map((p) => (
+            <label
+              key={p.id}
+              className="flex gap-3 items-start rounded-lg border border-gray-200 p-3 bg-white"
+            >
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={!!checked[p.id]}
+                onChange={(e) =>
+                  setChecked((prev) => ({ ...prev, [p.id]: e.target.checked }))
+                }
+              />
+              <div className="flex-1">
+                <div className="text-xs text-gray-500 mb-1">
+                  承認前 ・ {p.facilityId ?? "-"} ・ {formatDate(p.createdAt)}
+                </div>
+                <div className="flex gap-3">
+                  <SmallThumb path={p.media?.[0]?.path ?? null} />
+                  <div className="whitespace-pre-wrap flex-1 py-1">{p.body}</div>
+                </div>
+              </div>
+            </label>
+          ))}
         </div>
-        <div className="whitespace-pre-wrap">{p.body}</div>
-      </div>
-    </label>
-  ))}
-</div>
 
         {/* 公開ボタン */}
         <div className="mt-5">
@@ -169,22 +219,28 @@ export default function LicologPage() {
           <div className="text-gray-500">まだ承認履歴はありません。</div>
         ) : (
           <ul className="space-y-3">
-            {history.map((ev) => (
-              <li
-                key={ev.id}
-                className="rounded-lg border border-gray-200 p-3 bg-white"
-              >
-                <div className="text-sm">
-                  <span className="inline-block px-2 py-0.5 text-xs rounded bg-emerald-100 text-emerald-700 mr-2">
-                    承認
-                  </span>
-                  postId: <code className="text-xs">{ev.postId}</code>
-                </div>
-                <div className="text-xs text-gray-500 mt-1">
-                  承認者: <code>{ev.approvedBy}</code> ／ {formatDate(ev.createdAt)}
-                </div>
-              </li>
-            ))}
+            {history.map((ev) => {
+              const title =
+                (postBodies[ev.postId] || "").split(/\r?\n/)[0] ||
+                "(本文取得中…)";
+              return (
+                <li
+                  key={ev.id}
+                  className="rounded-lg border border-gray-200 p-3 bg-white"
+                >
+                  <div className="text-sm">
+                    <span className="inline-block px-2 py-0.5 text-xs rounded bg-emerald-100 text-emerald-700 mr-2">
+                      承認
+                    </span>
+                    <span className="font-medium">{title}</span>
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    承認者: <code>{ev.approvedBy}</code> ／{" "}
+                    {formatDate(ev.createdAt)}
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>

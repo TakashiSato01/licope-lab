@@ -4,3 +4,35 @@
 :root { color-scheme: light; }
 html, body, #root { height: 100%; }
 body { margin: 0; background: #f8f8f8; color: #3a3732; }
+
+/* ===== Admin 固定レイアウト（色は一切変更しない）===== */
+:root {
+  --adm-header-h: 56px;     /* いま使ってるヘッダー高さに合わせて調整。数値だけ変更可 */
+  --adm-sidebar-w: 240px;   /* 現在のサイド幅に合わせる */
+}
+
+/* タブレット以上でだけ固定。SPは既存のドロワーを優先 */
+@media (min-width: 768px) {
+  .adm-header {
+    position: fixed;
+    inset: 0 0 auto 0;   /* top:0 left:0 right:0 */
+    z-index: 50;
+    height: var(--adm-header-h);
+  }
+  .adm-sidebar {
+    position: fixed;
+    top: var(--adm-header-h);
+    left: 0;
+    bottom: 0;
+    width: var(--adm-sidebar-w);
+    z-index: 40;
+  }
+  .adm-sidebar__scroll {
+    height: calc(100vh - var(--adm-header-h));
+    overflow-y: auto;
+  }
+  .adm-main {
+    padding-top: var(--adm-header-h);
+    padding-left: var(--adm-sidebar-w);
+  }
+}

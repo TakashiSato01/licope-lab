@@ -1,4 +1,3 @@
-// apps/admin/src/lib/repositories/licolog.ts
 import {
   collection,
   query,
@@ -8,9 +7,16 @@ import {
   writeBatch,
   doc,
   serverTimestamp,
-  limit as qLimit,         // ★ 追加
+  limit as qLimit,
 } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
+
+export type LicologMedia = {
+  path: string;
+  width?: number;
+  height?: number;
+  bytes?: number;
+};
 
 export type AdminLicologPost = {
   id: string;
@@ -18,11 +24,12 @@ export type AdminLicologPost = {
   orgId: string;
   facilityId: string;
   status: "pending" | "approved" | "hidden";
+  media?: LicologMedia[]; // ← 追加
   createdAt?: any;
   updatedAt?: any;
 };
 
-// ★ 承認イベントの型を追加
+// 承認イベントの型
 export type LicologApprovalEvent = {
   id: string;
   type: "licolog_approved";
@@ -34,7 +41,7 @@ export type LicologApprovalEvent = {
 
 const ORG_ID = "demo-org";
 
-// --- 既存: 承認待ち購読 ---
+// --- 承認待ち購読 ---
 export function subscribePendingLicologPosts(
   cb: (posts: AdminLicologPost[]) => void
 ): () => void {
@@ -53,7 +60,7 @@ export function subscribePendingLicologPosts(
   });
 }
 
-// --- 既存: 複数承認＋イベント書き込み ---
+// --- 複数承認＋イベント書き込み ---
 export async function bulkApproveLicologPosts(ids: string[]): Promise<void> {
   if (ids.length === 0) return;
   const user = auth.currentUser;
@@ -79,7 +86,7 @@ export async function bulkApproveLicologPosts(ids: string[]): Promise<void> {
   await batch.commit();
 }
 
-// ★ 新規: 承認履歴（events）購読
+// --- 承認履歴（events）購読 ---
 export function subscribeLicologApprovalEvents(
   cb: (events: LicologApprovalEvent[]) => void,
   options?: { limit?: number }
