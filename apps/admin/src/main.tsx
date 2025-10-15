@@ -18,6 +18,9 @@ import TokushoPage from "./pages/TokushoPage";
 import PolicyPage from "./pages/PolicyPage";
 import FaqPage from "./pages/FaqPage";
 import NewsPage from "./pages/NewsPage";
+import WorksPage from "./pages/WorksPage";
+import AnalysisPage from "./pages/AnalysisPage";
+import UserSettingsPage from "./pages/UserSettingsPage";
 
 
 // 公開配下（認証不要）
@@ -68,6 +71,7 @@ function App() {
         {/* 管理レイアウト配下（Outletで表示） */}
         <Route element={<AuthGate><Dashboard /></AuthGate>}>
           <Route index element={<DashboardHome />} />
+          <Route path="settings" element={<UserSettingsPage />} />
           <Route path="jobs" element={<JobsPage />} />
           <Route path="jobs/new" element={<JobCreatePage />} />
           <Route path="jobs/:id/edit" element={<JobEditPage />} />
@@ -75,6 +79,8 @@ function App() {
           <Route path="applications" element={<ApplicationsPage />} />
           <Route path="news" element={<NewsPage />} />
           <Route path="faq" element={<FaqPage />} />
+          <Route path="works" element={<WorksPage />} />
+          <Route path="analysis" element={<AnalysisPage />} />
           <Route path="legal/tokusho" element={<TokushoPage />} />
           <Route path="legal/policy" element={<PolicyPage />} />
         </Route>

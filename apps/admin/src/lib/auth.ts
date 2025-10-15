@@ -5,7 +5,13 @@ import { db } from "./firebase";
 export const ORG_ID = "demo-org";
 
 export type Role = "owner" | "admin" | "editor" | "staff" | "viewer";
-export type Member = { role: Role; email?: string; displayName?: string };
+export type Member = {
+  role: Role;
+  email?: string;
+  displayName?: string;
+  photoURL?: string;
+  avatarPath?: string;
+};
 
 export function memberDocRef(uid: string) {
   return doc(db, `organizations/${ORG_ID}/members/${uid}`);

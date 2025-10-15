@@ -101,6 +101,7 @@ export function subscribeOrgWall(cb: (posts: LicologPost[]) => void) {
    const qy = query(
      col,
      where("orgId", "==", ORG_ID),
+    where("status", "==", "approved"),
      orderBy("createdAt", "desc"),
    );
    unsub = onSnapshot(

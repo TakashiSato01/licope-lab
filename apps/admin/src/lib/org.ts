@@ -45,7 +45,7 @@ export function useFacilityMetaByContractId(orgId: string, contractId?: string |
 
 /** 自分のメンバー情報 live 取得（displayName, facilityId など使う用） */
 export function useMyMember(orgId: string, uid?: string | null) {
-  const [me, set] = useState<{ displayName?: string; facilityId?: string } | null>(null);
+  const [me, set] = useState<{ displayName?: string; facilityId?: string; photoURL?: string } | null>(null);
   useEffect(() => {
     if (!uid) { set(null); return; }
     return onSnapshot(memberDocRef(orgId, uid), (s) => set((s.data() as any) ?? null));

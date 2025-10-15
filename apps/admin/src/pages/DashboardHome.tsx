@@ -22,6 +22,7 @@ import {
   CartesianGrid,
 } from "recharts";
 import { getDownloadURL, ref } from "firebase/storage";
+import { AlertCircle } from "lucide-react";
 
 const ORG_ID = "demo-org";
 
@@ -163,6 +164,80 @@ function Thumb({
         </div>
       )}
     </div>
+  );
+}
+
+/* ---------- 最新お知らせバナー ---------- */
+function AnnouncementBanner({ orgId = ORG_ID }: { orgId?: string }) {
+  const [items, setItems] = useState<NewsItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const ref = collection(db, "organizations", orgId, "news");
+    const qq = query(ref, orderBy("createdAt", "desc"), limit(3));
+    const unsub = onSnapshot(qq, (snap) => {
+      setItems(snap.docs.map(d => ({ id: d.id, ...(d.data() as any) })));
+      setLoading(false);
+    });
+    return () => unsub();
+  }, [orgId]);
+
+  const latest = items[0];
+
+  // 骨
+  if (loading) {
+    return (
+      <div className="rounded-xl border border-black/10 bg-black/[0.02] px-4 py-3">
+        <div className="h-5 w-2/3 animate-pulse bg-black/10 rounded" />
+      </div>
+    );
+  }
+
+  // データなしなら既存文＋一覧リンク
+  if (!latest) {
+    return (
+      <div className="rounded-xl border border-black/10 bg-black/[0.02] px-4 py-3">
+        <div className="text-[12px]">
+          <span className="inline-block mr-2">【事務局からのお知らせ】</span>
+          現在、最新版のリコペ ver1.0 です。リリースノートは
+          <Link to="/news" className="text-sky-600 hover:underline ml-1">こちら</Link>
+        </div>
+      </div>
+    );
+  }
+
+  const chip =
+    latest.level === "alert" ? "bg-red-100 text-red-700" :
+    latest.level === "update" ? "bg-blue-100 text-blue-700" :
+    "bg-gray-100 text-gray-700";
+
+  return (
+    <Link
+      to={`/news#${latest.id}`}
+      className="group block rounded-xl border border-black/10 bg-white px-4 py-3 hover:shadow-sm hover:border-black/20 transition relative overflow-hidden"
+    >
+      {/* 左の薄いアクセント */}
+      <span className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-black/20 to-black/5" />
+
+      <div className="flex items-start gap-3">
+        <div className="mt-0.5 opacity-70"><AlertCircle size={18} /></div>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className={`text-[11px] px-2 py-[2px] rounded-full ${chip}`}>
+              {latest.level === "alert" ? "重要" : latest.level === "update" ? "更新" : "お知らせ"}
+            </span>
+            {latest.createdAt?.toDate && (
+              <time className="text-[11px] text-gray-500">
+                {latest.createdAt.toDate().toLocaleDateString()}
+              </time>
+            )}
+          </div>
+          <div className="text-[13px] font-medium truncate">{latest.title}</div>
+          {latest.body && <div className="text-[12px] text-gray-600 truncate">{latest.body}</div>}
+          <div className="text-[12px] text-sky-600 mt-0.5 underline-offset-2 group-hover:underline">詳細を見る</div>
+        </div>
+      </div>
+    </Link>
   );
 }
 
@@ -509,13 +584,7 @@ const qViewsYday = query(
       </div>
 
       {/* フッター：お知らせ & コピーライト/ポリシー */}
-      <div className="rounded-xl border border-black/5 bg-[#111]/[0.02] px-4 py-3">
-        <div className="text-[12px]">
-          <span className="inline-block mr-2">【事務局からのお知らせ】</span>
-          現在、最新版のリコペ ver1.0 です。リリースノートは
-          <a className="text-sky-600 hover:underline ml-1" href="#" onClick={(e)=>e.preventDefault()}>こちら</a>
-        </div>
-      </div>
+      <AnnouncementBanner />
 
       <footer className="py-6 text-[12px] text-gray-500 flex items-center justify-between">
         <div>© GLOCALIZATION</div>

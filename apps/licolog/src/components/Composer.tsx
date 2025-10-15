@@ -1,79 +1,64 @@
-import React, { useRef, useState } from "react";
-import { addLicologPost } from "/src/lib/repositories/licolog";
+// apps/licolog/src/Composer.tsx
+import { useRef, useState } from "react";
+import { addLicologPost, updateLicologPost } from "../lib/repositories/licolog";
+import type { LicologPost } from "../lib/types/licolog";
 
-export default function Composer() {
-  const [body, setBody] = useState("");
+export default function Composer({
+  open, onClose, editing,
+}: { open: boolean; onClose: () => void; editing?: LicologPost }) {
+  const [text, setText] = useState(editing?.body ?? "");
   const [files, setFiles] = useState<File[]>([]);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const picking = useRef<HTMLInputElement>(null);
+  if (!open) return null;
 
   const onPick = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = Array.from(e.target.files || []);
-    setFiles(cur => [...cur, ...f].slice(0, 4)); // 最大4枚
-    if (inputRef.current) inputRef.current.value = ""; // 同じファイル再選択OK
+    setFiles((prev) => [...prev, ...f]);
+    e.target.value = "";
   };
 
-  const submit = async () => {
-    if (!body.trim()) return;
-    setBusy(true);
-    setErr(null);
-    try {
-      await addLicologPost(body.trim(), files);
-      // ★ 成功時は全部クリア
-      setBody("");
-      setFiles([]);
-      if (inputRef.current) inputRef.current.value = "";
-    } catch (e: any) {
-      setErr(e?.message ?? String(e));
-    } finally {
-      setBusy(false);
+  const onSubmit = async () => {
+    if (!text.trim() && files.length === 0) return;
+    if (editing?.id) {
+      await updateLicologPost(editing.id, { newBody: text, files });
+    } else {
+      await addLicologPost(text, files);
     }
+    setText(""); setFiles([]); onClose();
   };
 
   return (
-    <div className="mb-6">
-      <textarea
-        className="w-full rounded-2xl bg-white/5 text-white p-4 min-h-[140px]"
-        placeholder="いまどうしてる？（140〜500字）"
-        value={body}
-        onChange={(e) => setBody(e.target.value)}
-      />
-      <div className="flex items-center justify-between mt-3">
-        <div className="text-white/80">
-          <label className="cursor-pointer">
-            <span className="mr-3">画像を選択（最大4枚）</span>
-            <input
-              ref={inputRef}
-              type="file"
-              accept="image/*"
-              multiple
-              className="hidden"
-              onChange={onPick}
-            />
-          </label>
+    <div className="fixed inset-0 bg-black/30 grid place-items-center z-50">
+      <div className="w-[min(640px,92vw)] bg-white rounded-2xl p-4">
+        <h3 className="font-semibold mb-2">{editing ? "投稿を編集" : "新規投稿"}</h3>
+        <textarea
+          rows={5}
+          value={text}
+          onChange={(e)=>setText(e.target.value)}
+          className="w-full border rounded-xl p-3 outline-none focus:ring-2 focus:ring-[var(--brand)]"
+          placeholder="いまの気持ちや出来事…"
+        />
+        {!!files.length && (
+          <ul className="mt-2 text-xs text-gray-600 space-y-1">
+            {files.map((f, i) => <li key={i}>📎 {f.name}</li>)}
+          </ul>
+        )}
+
+        <div className="mt-3 flex items-center justify-between">
+          <div className="space-x-2">
+            <button onClick={()=>picking.current?.click()} className="px-3 py-2 border rounded-lg">
+              画像を追加
+            </button>
+            <input ref={picking} type="file" accept="image/*" multiple hidden onChange={onPick} />
+          </div>
+          <div className="space-x-2">
+            <button onClick={onClose} className="px-4 py-2 rounded-lg border">キャンセル</button>
+            <button onClick={onSubmit} className="px-4 py-2 rounded-lg text-white" style={{background:"var(--brand)"}}>
+              {editing ? "更新" : "投稿"}
+            </button>
+          </div>
         </div>
-        <button
-          onClick={submit}
-          disabled={busy || !body.trim()}
-          className="px-5 py-2 rounded-xl bg-white text-black disabled:opacity-50"
-        >
-          {busy ? "投稿中…" : "投稿"}
-        </button>
       </div>
-
-      {/* 選択中のプレビュー（投稿後は消える） */}
-      {files.length > 0 && (
-        <div className="mt-3 flex gap-2 flex-wrap">
-          {files.map((f, i) => (
-            <span key={i} className="text-xs text-white/70 bg-white/10 rounded px-2 py-1" title={f.name}>
-              {f.name}
-            </span>
-          ))}
-        </div>
-      )}
-
-      {err && <div className="mt-3 text-sm text-red-400">{err}</div>}
     </div>
   );
 }
