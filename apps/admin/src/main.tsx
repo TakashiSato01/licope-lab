@@ -1,3 +1,4 @@
+// main.tsx
 import React, { useEffect, useState } from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
@@ -21,6 +22,9 @@ import NewsPage from "./pages/NewsPage";
 import WorksPage from "./pages/WorksPage";
 import AnalysisPage from "./pages/AnalysisPage";
 import UserSettingsPage from "./pages/UserSettingsPage";
+import AdminSettingsPage from "./pages/admin/AdminSettingsPage";
+import AdminMembersListPage from "./pages/admin/AdminMembersListPage";
+import AdminMemberDetailPage from "./pages/admin/AdminMemberDetailPage";
 
 
 // 公開配下（認証不要）
@@ -29,6 +33,8 @@ import ApplyPage from "./pages/public/ApplyPage";
 
 // ログイン画面
 import Login from "./pages/Login";
+import PasswordReset from "./pages/PasswordReset";
+
 
 // --- 認証ゲート：未ログインなら <Login /> を表示 ---
 function AuthGate({ children }: { children: React.ReactNode }) {
@@ -72,6 +78,9 @@ function App() {
         <Route element={<AuthGate><Dashboard /></AuthGate>}>
           <Route index element={<DashboardHome />} />
           <Route path="settings" element={<UserSettingsPage />} />
+          <Route path="admin/settings" element={<AdminSettingsPage />} />
+          <Route path="admin/members" element={<AdminMembersListPage />} />
+          <Route path="admin/members/:id" element={<AdminMemberDetailPage />} />
           <Route path="jobs" element={<JobsPage />} />
           <Route path="jobs/new" element={<JobCreatePage />} />
           <Route path="jobs/:id/edit" element={<JobEditPage />} />
@@ -88,6 +97,8 @@ function App() {
         {/* 公開ページ（認証不要） */}
         <Route path="/p/:orgId/jobs/:jobId" element={<PublicJobPage />} />
         <Route path="/p/:orgId/jobs/:jobId/apply" element={<ApplyPage />} />
+        {/* 認証不要のパスワードリセット（ダッシュボード外） */}
+        <Route path="/password-reset" element={<PasswordReset />} />
 
         {/* 不明ルートはトップへ */}
         <Route path="*" element={<Navigate to="/" replace />} />

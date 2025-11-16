@@ -31,7 +31,11 @@ export default function Login() {
         <button disabled={busy} className="w-full rounded-xl bg-[#f579a4] text-white py-2">
           {busy ? "サインイン中…" : "ログイン"}
         </button>
-        <div className="text-xs text-gray-500 mt-3">※ 新規登録は管理側で追加します。</div>
+         <div className="mt-4 text-center">
+           <a href="/password-reset" className="text-sm text-[#f579a4] hover:underline">
+             パスワードを忘れた方はこちら
+           </a>
+         </div>
       </form>
     </div>
   );

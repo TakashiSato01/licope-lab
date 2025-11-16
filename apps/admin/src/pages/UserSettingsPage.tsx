@@ -25,11 +25,6 @@ export default function UserSettingsPage() {
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
 
-  // パスワード変更用
-  const [currPw, setCurrPw]       = useState("");
-  const [newPw, setNewPw]         = useState("");
-  const [newPw2, setNewPw2]       = useState("");
-
   // 読み取り専用の表示値（法人名・施設名）
   useEffect(() => {
     (async () => {
@@ -84,11 +79,6 @@ export default function UserSettingsPage() {
       );
 
       if (email && email !== user.email) {
-        // 本番では再認証が必要になることがある
-        if (currPw) {
-          const cred = EmailAuthProvider.credential(user.email || "", currPw);
-          await reauthenticateWithCredential(user, cred);
-        }
         await updateEmail(user, email);
       }
 
@@ -222,11 +212,10 @@ export default function UserSettingsPage() {
 
       {/* 読み取り専用 */}
       <section className="bg-white rounded-xl border border-black/5 p-4 mb-6">
-        <h2 className="font-medium mb-3">アカウント情報（変更不可）</h2>
+        <h2 className="font-medium mb-3">法人・施設情報</h2>
         <div className="grid sm:grid-cols-2 gap-4 text-sm">
           <Labeled label="法人名"><div className="text-gray-600">{ro.orgName}</div></Labeled>
           <Labeled label="施設名"><div className="text-gray-600">{ro.facilityName}</div></Labeled>
-          <Labeled label="ユーザーID"><div className="text-gray-600">{ro.uid}</div></Labeled>
         </div>
       </section>
 
@@ -246,10 +235,6 @@ export default function UserSettingsPage() {
             <input className="w-full px-3 py-2 rounded-lg border"
                    type="email" value={email} onChange={(e)=>setEmail(e.target.value)} />
           </Labeled>
-          <Labeled label="（必要時）現在のパスワード" hint="メール変更やPW変更で求められる場合があります" span={2}>
-            <input className="w-full px-3 py-2 rounded-lg border"
-                   type="password" value={currPw} onChange={(e)=>setCurrPw(e.target.value)} />
-          </Labeled>
         </div>
         <div className="mt-4">
           <button
@@ -261,31 +246,23 @@ export default function UserSettingsPage() {
           </button>
         </div>
       </section>
+      {msg && <div className="mt-4 text-sm text-gray-700">{msg}</div>}
 
-      {/* パスワード変更 */}
-      <section className="bg-white rounded-xl border border-black/5 p-4">
-        <h2 className="font-medium mb-3">パスワード変更</h2>
-        <div className="grid sm:grid-cols-2 gap-4">
-          <Labeled label="新しいパスワード">
-            <input className="w-full px-3 py-2 rounded-lg border"
-                   type="password" value={newPw} onChange={(e)=>setNewPw(e.target.value)} />
-          </Labeled>
-          <Labeled label="新しいパスワード（確認）">
-            <input className="w-full px-3 py-2 rounded-lg border"
-                   type="password" value={newPw2} onChange={(e)=>setNewPw2(e.target.value)} />
-          </Labeled>
-        </div>
-        <div className="mt-4">
-          <button
-            onClick={onChangePassword}
-            className="px-5 py-2 rounded-md text-white bg-gray-700 hover:bg-gray-800"
+      {/* パスワード変更は専用ページへ案内 */}
+      <section className="bg-white rounded-xl border border-black/5 p-4 mt-6">
+        <h2 className="font-medium mb-2">パスワード</h2>
+        <p className="text-sm text-gray-600">
+          パスワードの変更は専用ページから行えます。
+        </p>
+        <div className="mt-3">
+          <a
+            href="/password-reset"
+            className="inline-flex items-center px-4 py-2 rounded-md text-white bg-gray-700 hover:bg-gray-800"
           >
-            パスワードを更新
-          </button>
+            パスワード変更はこちら
+          </a>
         </div>
       </section>
-
-      {msg && <div className="mt-4 text-sm text-gray-700">{msg}</div>}
     </div>
   );
 }

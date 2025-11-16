@@ -18,7 +18,7 @@ export default function TokushoPage() {
 
           <dt className="font-semibold">電話番号</dt>
           <dd className="md:col-span-2">
-            運営上の都合により公開していません。請求があれば遅滞なく開示します。
+            070-5325-5195
           </dd>
 
           <dt className="font-semibold">メールアドレス</dt>
@@ -73,10 +73,6 @@ export default function TokushoPage() {
           </dd>
         </dl>
       </section>
-
-      <p className="text-sm text-gray-500">
-        ※本表記は雛形です。実運用前に自社情報へ差し替えのうえ、法務確認を推奨します。
-      </p>
     </div>
   );
 }

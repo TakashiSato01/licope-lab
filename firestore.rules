@@ -89,6 +89,16 @@ service cloud.firestore {
           && resource.data.status == 'pending'
           && request.resource.data.status in ['approved','hidden'];
 
+         // 取消（approved → pending）
+         allow update: if hasAnyRole(orgId, ['owner','admin'])
+           && resource.data.orgId == orgId
+           && request.resource.data.orgId == orgId
+           && resource.data.status == 'approved'
+           && request.resource.data.status == 'pending'
+           && request.resource.data.authorUid == resource.data.authorUid
+           && request.resource.data.facilityId == resource.data.facilityId
+           && request.resource.data.createdAt == resource.data.createdAt;
+
         // 物理削除は不可
         allow delete: if false;
       }

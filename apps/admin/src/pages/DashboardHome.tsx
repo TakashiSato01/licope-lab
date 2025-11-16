@@ -590,7 +590,7 @@ const qViewsYday = query(
         <div>© GLOCALIZATION</div>
         <div className="space-x-4">
           <NavLink to="/legal/tokusho" className={nav}>特定商取引法に関する表記</NavLink>
-          <NavLink to="/legal/policy" className={nav}>ポリシー</NavLink>
+          <NavLink to="/legal/policy" className={nav}>プライバシーポリシー</NavLink>
         </div>
       </footer>
     </div>
