@@ -8,6 +8,7 @@ export default function Composer({
 }: { open: boolean; onClose: () => void; editing?: LicologPost }) {
   const [text, setText] = useState(editing?.body ?? "");
   const [files, setFiles] = useState<File[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const picking = useRef<HTMLInputElement>(null);
   if (!open) return null;
 
@@ -18,13 +19,32 @@ export default function Composer({
   };
 
   const onSubmit = async () => {
-    if (!text.trim() && files.length === 0) return;
-    if (editing?.id) {
-      await updateLicologPost(editing.id, { newBody: text, files });
-    } else {
-      await addLicologPost(text, files);
-    }
-    setText(""); setFiles([]); onClose();
+   if (!text.trim() && files.length === 0) return;
+
+   try {
+     setIsSubmitting(true);
+
+     if (editing?.id) {
+       await updateLicologPost(editing.id, { newBody: text, files });
+     } else {
+       await addLicologPost(text, files);
+     }
+
+     // 成功通知（暫定：alert、後でtoastに差し替え）
+     alert("投稿しました");
+
+     // 投稿後はフォームをクリアし、モーダルを閉じる
+     setText("");
+     setFiles([]);
+     onClose();
+
+   } catch (e) {
+     console.error(e);
+     alert("投稿に失敗しました。時間をおいて再度お試しください。");
+
+   } finally {
+     setIsSubmitting(false);
+   }
   };
 
   return (
@@ -53,8 +73,20 @@ export default function Composer({
           </div>
           <div className="space-x-2">
             <button onClick={onClose} className="px-4 py-2 rounded-lg border">キャンセル</button>
-            <button onClick={onSubmit} className="px-4 py-2 rounded-lg text-white" style={{background:"var(--brand)"}}>
-              {editing ? "更新" : "投稿"}
+            <button
+            onClick={onSubmit}
+            disabled={isSubmitting}
+            className={
+              "px-4 py-2 rounded-lg text-white " +
+              (isSubmitting ? "opacity-60 cursor-not-allowed" : "")
+            }
+            style={{ background: "var(--brand)" }}
+            >
+            {isSubmitting
+              ? "送信中…"
+              : editing
+                ? "更新"
+                : "投稿"}
             </button>
           </div>
         </div>

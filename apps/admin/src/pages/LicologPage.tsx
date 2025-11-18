@@ -70,11 +70,11 @@ function SmallThumb({
 }
 
 export default function LicologPage() {
-  // 承認待ち
+  // 公開待ち
   const [pending, setPending] = useState<AdminLicologPost[]>([]);
   const [checked, setChecked] = useState<Record<string, boolean>>({});
 
-  // 履歴（承認・取消 共通のイベント）
+  // 履歴（公開・取消 共通のイベント）
   const [events, setEvents] = useState<LicologEvent[]>([]);
   const [postBodies, setPostBodies] = useState<Record<string, string>>({});
 
@@ -127,7 +127,7 @@ export default function LicologPage() {
     setChecked(m);
   };
 
-  // 承認
+  // 公開
   async function onApproveSelected() {
     if (!selectedIds.length) return;
     if (
@@ -146,15 +146,15 @@ export default function LicologPage() {
     }
   }
 
-  // 未承認へ戻す
+  // 未公開へ戻す
   async function onUnapprove(id: string) {
-    if (!confirm("この投稿を未承認（pending）に戻します。よろしいですか？")) return;
+    if (!confirm("この投稿を未公開（pending）に戻します。よろしいですか？")) return;
     try {
       await unapproveLicologPost(id);
       // 成功すれば監視で自動反映される
     } catch (e) {
       console.error(e);
-      alert("未承認に戻せませんでした");
+      alert("未公開に戻せませんでした");
     }
   }
 
@@ -180,12 +180,12 @@ export default function LicologPage() {
         </a>
       </div>
 
-      {/* 承認待ち */}
+      {/* 公開待ち */}
       <section>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold">リコログ承認</h2>
+          <h2 className="text-xl font-semibold">リコログを求人ページに公開</h2>
           <div className="text-sm text-gray-500">
-            承認待ち: {pending.length} 件
+            公開待ち: {pending.length} 件
           </div>
         </div>
 
@@ -204,7 +204,7 @@ export default function LicologPage() {
         <div className="space-y-3">
           {pending.length === 0 && (
             <div className="text-gray-500">
-              承認待ちのリコログはありません。
+              公開待ちのリコログはありません。
             </div>
           )}
           {pending.map((p) => (
@@ -222,7 +222,7 @@ export default function LicologPage() {
               />
               <div className="flex-1">
                 <div className="text-xs text-gray-500 mb-1">
-                  承認前 ・ {p.facilityId ?? "-"} ・ {formatDate(p.createdAt)}
+                  未公開 ・ {p.facilityId ?? "-"} ・ {formatDate(p.createdAt)}
                 </div>
                 <div className="flex gap-3">
                   <SmallThumb path={p.media?.[0]?.path ?? null} />
@@ -248,9 +248,9 @@ export default function LicologPage() {
         </div>
       </section>
 
-      {/* 承認履歴（承認・取消） */}
+      {/* 公開履歴（公開・取消） */}
       <section>
-        <h2 className="text-xl font-semibold mb-4">承認履歴</h2>
+        <h2 className="text-xl font-semibold mb-4">公開履歴</h2>
         {events.length === 0 ? (
           <div className="text-gray-500">まだ履歴はありません。</div>
         ) : (
@@ -268,7 +268,7 @@ export default function LicologPage() {
                   <div className="text-sm">
                     {isApproved ? (
                       <span className="inline-block px-2 py-0.5 text-xs rounded bg-emerald-100 text-emerald-700 mr-2">
-                        承認
+                        公開
                       </span>
                     ) : (
                       <span className="inline-block px-2 py-0.5 text-xs rounded bg-slate-200 text-slate-700 mr-2">
@@ -281,15 +281,15 @@ export default function LicologPage() {
                     操作: <code>{ev.approvedBy}</code> ／ {formatDate(ev.createdAt)}
                   </div>
 
-                  {/* 「未承認に戻す」は承認イベントの行にだけ表示 */}
+                  {/* 「未公開に戻す」は公開イベントの行にだけ表示 */}
                   {isApproved && (
                     <div className="mt-2">
                       <button
                         onClick={() => onUnapprove(ev.postId)}
                         className="px-3 py-1.5 rounded-md border hover:bg-black/5 text-sm"
-                        title="未承認（pending）に戻す"
+                        title="未公開（pending）に戻す"
                       >
-                        未承認に戻す
+                        未公開に戻す
                       </button>
                     </div>
                   )}

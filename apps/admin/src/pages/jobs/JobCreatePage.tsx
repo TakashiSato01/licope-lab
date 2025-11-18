@@ -1,7 +1,7 @@
-// apps/admin/src/pages/jobs/JobCreatePage.tsx
+// src/pages/jobs/JobCreatePage.tsx
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import type { JobDraft } from "@/lib/repositories/jobs";
+import type { JobDraft } from "@/types/JobDraft";
 import { publishJob } from "@/lib/repositories/jobs";
 import JobForm from "./JobForm";
 import JobPreview from "./JobPreview";
@@ -17,9 +17,23 @@ export default function JobCreatePage() {
     title: "",
     wage: "",
     description: "",
+
+    facilityName: "",
+    facilityAddress: "",
+    facilityType: "",
+
+    employmentType: "",
+    workingHours: "",
+    requirements: "",
+    benefits: "",
+
+    thumbnailURL: null,
+    thumbnailPath: null,
+
     thumbFile: null,
     thumbPreviewURL: null,
   });
+
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -43,14 +57,19 @@ export default function JobCreatePage() {
 
   async function onSubmit() {
     if (submitting) return;
-    if (!draft.title?.trim()) {
+    if (!draft.title.trim()) {
       alert("タイトルを入力してください。");
       return;
     }
+
     setSubmitting(true);
     try {
       await publishJob(
-        { title: draft.title, wage: draft.wage, description: draft.description },
+        {
+          ...draft,
+          thumbnailURL: null,
+          thumbnailPath: null,
+        },
         { thumbnailFile: draft.thumbFile ?? null }
       );
       navigate("/jobs");
@@ -69,9 +88,7 @@ export default function JobCreatePage() {
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <div className="rounded-xl bg-white border border-black/5 p-4">
           <JobForm
-            title={draft.title}
-            wage={draft.wage}
-            description={draft.description}
+            draft={draft}
             onChange={handleField}
             thumbPreviewURL={draft.thumbPreviewURL || null}
             onSelectThumb={handleThumbSelect}
@@ -82,12 +99,10 @@ export default function JobCreatePage() {
         </div>
 
         <div className="rounded-xl bg-white border border-black/5 p-4">
-          <JobPreview
-            title={draft.title}
-            wage={draft.wage}
-            description={draft.description}
-            thumbnailURL={draft.thumbPreviewURL || null}
-          />
+<JobPreview
+  job={draft}                       // これが JobDraft である必要がある
+  thumbnailURL={draft.thumbPreviewURL || null}
+/>
         </div>
       </div>
     </div>

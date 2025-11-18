@@ -1,7 +1,10 @@
 // apps/*/src/lib/firebase.ts
 import { initializeApp } from "firebase/app";
 import {
-  getAuth, signInAnonymously, onAuthStateChanged, connectAuthEmulator,
+  getAuth,
+  onAuthStateChanged,
+  connectAuthEmulator,
+  // signInAnonymously ← もう使わない
 } from "firebase/auth";
 import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
 import { getStorage, connectStorageEmulator } from "firebase/storage";
@@ -10,7 +13,6 @@ const app = initializeApp({
   apiKey: "demo",
   authDomain: "localhost",
   projectId: "licope-lab",
-  // ★ これが無いと Storage に書き込むときに "no default bucket" になります
   storageBucket: "licope-lab.appspot.com",
 });
 
@@ -23,20 +25,13 @@ connectAuthEmulator(auth, "http://127.0.0.1:9099");
 connectFirestoreEmulator(db, "127.0.0.1", 8080);
 connectStorageEmulator(storage, "127.0.0.1", 9199);
 
-// 匿名ログインを保証（描画前に await）
+// 認証状態が確定するまで待つ（勝手にゲストログインしない）
 export async function ensureSignedIn(): Promise<void> {
   if (auth.currentUser) return;
-  await new Promise<void>((resolve, reject) => {
-    const unsub = onAuthStateChanged(
-      auth,
-      async (user) => {
-        if (user) { unsub(); resolve(); }
-        else {
-          try { await signInAnonymously(auth); }
-          catch (e) { unsub(); reject(e); }
-        }
-      },
-      reject
-    );
+  await new Promise<void>((resolve) => {
+    const unsub = onAuthStateChanged(auth, () => {
+      unsub();
+      resolve();
+    });
   });
 }

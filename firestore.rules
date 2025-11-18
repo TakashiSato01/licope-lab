@@ -16,10 +16,11 @@ service cloud.firestore {
       return signedIn() && roles.hasAny([roleOf(orgId)]);
     }
 
-    // News: ダッシュボード用（新しい順で読むだけ）
+    // ==========================================================
+    // News
+    // ==========================================================
     match /organizations/{orgId}/news/{newsId} {
-      allow read: if signedIn();   // 開発中は true でもOK
-      // 作成も入れるなら↓（任意）
+      allow read: if signedIn();
       allow create: if signedIn()
         && request.resource.data.orgId == orgId
         && isString(request.resource.data.title)
@@ -27,51 +28,76 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
-    /** テナント境界：全データは organizations/{orgId} 配下に置く前提 */
+    // ==========================================================
+    // organizations/{orgId} 以下
+    // ==========================================================
     match /organizations/{orgId} {
 
-      // ───────── 法人メタ（org doc 本体）
-      allow read:   if signedIn();
+      // org 本体
+      allow read: if signedIn();
       allow update: if hasAnyRole(orgId, ['owner','admin']);
       allow create, delete: if false;
 
-      // ───────── 施設（契約単位）
+      // 施設
       match /facilities/{facilityId} {
-        allow read:  if signedIn();
+        allow read: if signedIn();
         allow write: if hasAnyRole(orgId, ['owner','admin']);
       }
 
-      // ───────── メンバー
+      // メンバー
       match /members/{uid} {
-        allow read:  if signedIn() && (request.auth.uid == uid || hasAnyRole(orgId, ['owner','admin']));
+        allow read: if signedIn() && (request.auth.uid == uid || hasAnyRole(orgId, ['owner','admin']));
         allow write: if hasAnyRole(orgId, ['owner','admin']);
       }
 
-      // ───────── 公開求人メタ
+      // ==========================================================
+      // 公開求人 publicJobs
+      // ==========================================================
       match /publicJobs/{pubId} {
         allow read: if true;
+
+        // create（publishJob）
         allow create: if hasAnyRole(orgId, ['owner','admin','editor'])
           && request.resource.data.orgId == orgId
           && isString(request.resource.data.title)
+          && isString(request.resource.data.wage)
+          && isString(request.resource.data.description)
           && isString(request.resource.data.storagePath)
+          // 施設情報
+          && isString(request.resource.data.facilityName)
+          && isString(request.resource.data.facilityAddress)
+          && isString(request.resource.data.facilityType)
+          // 求人情報
+          && isString(request.resource.data.employmentType)
+          && isString(request.resource.data.workingHours)
+          && isString(request.resource.data.requirements)
+          && isString(request.resource.data.benefits)
+          // サムネ（null か string）
+          && (request.resource.data.thumbnailPath is string
+              || request.resource.data.thumbnailPath == null)
+          && (request.resource.data.thumbnailURL is string
+              || request.resource.data.thumbnailURL == null)
+          // timestamp
           && request.resource.data.publishedAt is timestamp
           && isString(request.resource.data.publishedBy);
-        allow update, delete: if false;
+
+        // update（updatePublishedJob）
+        allow update: if hasAnyRole(orgId, ['owner','admin','editor'])
+          && request.resource.data.orgId == orgId;
+
+        allow delete: if false;
       }
 
-      // ───────── リコログ
+      // ==========================================================
+      // リコログ
+      // ==========================================================
       match /licologPosts/{postId} {
-
-        // 作成：ログイン + orgId 一致 + status は pending 固定
         allow create: if signedIn()
           && request.resource.data.orgId == orgId
           && request.resource.data.status == 'pending';
 
-        // 閲覧：管理画面は要ログイン。公開ページでは approved のみ可
         allow read: if signedIn() || resource.data.status == 'approved';
 
-        // ✅ 作者の通常編集：本文/画像の追加削除・updatedAt の更新のみ。
-        //    いずれも pending のまま（createdAt/orgId/authorUid/facilityId は不変）
         allow update: if signedIn()
           && resource.data.authorUid == request.auth.uid
           && resource.data.orgId == orgId
@@ -82,63 +108,72 @@ service cloud.firestore {
           && resource.data.status == 'pending'
           && request.resource.data.status == 'pending';
 
-        // 承認：editor 以上のみ、pending → approved/hidden の一方向
         allow update: if hasAnyRole(orgId, ['owner','admin','editor'])
           && resource.data.orgId == orgId
           && request.resource.data.orgId == orgId
           && resource.data.status == 'pending'
           && request.resource.data.status in ['approved','hidden'];
 
-         // 取消（approved → pending）
-         allow update: if hasAnyRole(orgId, ['owner','admin'])
-           && resource.data.orgId == orgId
-           && request.resource.data.orgId == orgId
-           && resource.data.status == 'approved'
-           && request.resource.data.status == 'pending'
-           && request.resource.data.authorUid == resource.data.authorUid
-           && request.resource.data.facilityId == resource.data.facilityId
-           && request.resource.data.createdAt == resource.data.createdAt;
+        allow update: if hasAnyRole(orgId, ['owner','admin'])
+          && resource.data.orgId == orgId
+          && request.resource.data.orgId == orgId
+          && resource.data.status == 'approved'
+          && request.resource.data.status == 'pending'
+          && request.resource.data.authorUid == resource.data.authorUid
+          && request.resource.data.facilityId == resource.data.facilityId
+          && request.resource.data.createdAt == resource.data.createdAt;
 
-        // 物理削除は不可
         allow delete: if false;
       }
 
-      // ───────── 承認イベント履歴
+      // 承認イベント
       match /events/{eventId} {
-        allow read:   if hasAnyRole(orgId, ['owner','admin','editor']);
+        allow read: if hasAnyRole(orgId, ['owner','admin','editor']);
         allow create: if hasAnyRole(orgId, ['owner','admin','editor'])
           && request.resource.data.orgId == orgId;
         allow update, delete: if false;
       }
 
-      // ───────── 応募（個人情報）
+      // ==========================================================
+      // applications（応募）
+      // ==========================================================
       match /applications/{appId} {
-        // 公開フォームからの作成のみ許可（必須項目）
         allow create: if request.resource.data.orgId == orgId
           && isString(request.resource.data.jobPubId)
           && isString(request.resource.data.name)
           && isString(request.resource.data.contact)
           && request.resource.data.createdAt is timestamp;
-        // 閲覧は owner/admin のみ
+
         allow read: if hasAnyRole(orgId, ['owner','admin']);
-        allow update, delete: if false;
+
+        allow update: if hasAnyRole(orgId, ['owner','admin'])
+          && request.resource.data.orgId == orgId
+          && request.resource.data.name == resource.data.name
+          && request.resource.data.contact == resource.data.contact
+          && request.resource.data.jobPubId == resource.data.jobPubId
+          && request.resource.data.createdAt == resource.data.createdAt
+          && request.resource.data.status in ['pending','review','done'];
+
+        allow delete: if false;
       }
 
-      // ───────── メトリクス（Functions が書く）
+      // metrics（読み取り専用）
       match /metrics/{document=**} {
-        allow read:  if hasAnyRole(orgId, ['owner','admin','editor','staff','viewer']);
+        allow read: if hasAnyRole(orgId, ['owner','admin','editor','staff','viewer']);
         allow write: if false;
       }
-      match /databases/{db}/documents {
-  match /organizations/{orgId}/jobViews/{docId} {
-    allow create: if true;            // 開発中は緩めで
-    allow read: if request.auth != null;
-  }
-}
+
+      // jobViews（PV 記録）
+      match /jobViews/{docId} {
+        allow create: if true;
+        allow read: if request.auth != null;
+      }
     }
-match /organizations/{orgId}/jobViews/{docId} {
-      allow create: if true;                 // 開発中は緩く
-      allow read: if request.auth != null;   // 管理画面から読む
+
+    // 別パスに二重定義してたので統一
+    match /organizations/{orgId}/jobViews/{docId} {
+      allow create: if true;
+      allow read: if request.auth != null;
     }
   }
 }

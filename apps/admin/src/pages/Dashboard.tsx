@@ -7,10 +7,20 @@ import {
   ChevronsLeft, ChevronsRight, Menu as MenuIcon
 } from "lucide-react";
 
-import { doSignOut, auth } from "@/lib/firebase";
+// Firebase
+import {
+  collection,
+  query,
+  where,
+  orderBy,
+  limit,
+  onSnapshot
+} from "firebase/firestore";
+import { db, doSignOut, auth } from "@/lib/firebase";  // ← db 必須
+
 import { ORG_ID } from "@/lib/auth";
 import { useOrgMeta, useMyMember, useFacilityMetaByContractId } from "@/lib/org";
-import { useOrgRole } from "@/hooks/useOrgRole"; // ← 重複しないように1回だけ
+import { useOrgRole } from "@/hooks/useOrgRole";
 
 function cn(...a: Array<string | false | null | undefined>) {
   return a.filter(Boolean).join(" ");
@@ -21,6 +31,9 @@ const DEFAULT_AVATAR = "/assets/avatar-default.png";
 export default function Dashboard() {
   const [collapsed, setCollapsed] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [loadingWall, setLoadingWall] = useState(true);   // ← 追加：読み込み中フラグ
+  const [posts, setPosts] = useState<any[]>([]);          // ← 追加：リコログ表示データ
+
 
   // サイド幅の反映
   useEffect(() => {
@@ -36,6 +49,34 @@ export default function Dashboard() {
   const me  = useMyMember(ORG_ID, uid);
   const { role } = useOrgRole(uid || "");
   const facility = useFacilityMetaByContractId(ORG_ID, me?.facilityId);
+
+ // ★ リコログ購読（管理者ダッシュボード用）
+ useEffect(() => {
+   // Firestore: organizations/{orgId}/licologPosts の approved を取得
+   setLoadingWall(true);
+   const col = collection(db, `organizations/${ORG_ID}/licologPosts`);
+   const q = query(
+     col,
+     where("status", "==", "approved"),
+     orderBy("createdAt", "desc"),
+     limit(20)
+   );
+
+   const unsub = onSnapshot(
+     q,
+     (snap) => {
+       const rows = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }));
+       setPosts(rows);
+       setLoadingWall(false);           // ← ここで読み込み完了
+     },
+     (err) => {
+       console.error("[Dashboard] licolog subscribe error:", err);
+       setPosts([]);
+       setLoadingWall(false);
+     }
+   );
+   return () => unsub();
+ }, []);
 
   // 表示名＆アイコン
   const displayName =
@@ -180,7 +221,7 @@ export default function Dashboard() {
 
       {/* Main */}
       <main className="adm-main" style={{ minHeight: "calc(100vh - var(--adm-header-h))" }}>
-        <Outlet />
+   <Outlet />
       </main>
     </div>
   );

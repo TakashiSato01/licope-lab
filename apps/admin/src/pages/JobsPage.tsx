@@ -1,86 +1,149 @@
-// apps/admin/src/pages/JobsPage.tsx
+// src/pages/jobs/JobsPage.tsx
 import React, { useEffect, useState } from "react";
-import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
-import { db, storage } from "@/lib/firebase";
 import { Link, useNavigate } from "react-router-dom";
-import { getDownloadURL, ref } from "firebase/storage";
+import {
+  collection,
+  onSnapshot,
+  orderBy,
+  query,
+  deleteDoc,
+  doc,
+} from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 const ORG_ID = "demo-org";
 
-type PublicJob = {
+type PublicJobMeta = {
   id: string;
   title: string;
-  publishedAt?: any;
-  thumbnailPath?: string | null;
+  wage: string;
+  facilityName: string;
+  facilityAddress: string;
+  facilityType: string;
+  employmentType: string;
+  workingHours: string;
   thumbnailURL?: string | null;
+  publishedAt?: any;
+  storagePath?: string | null;
+  thumbnailPath?: string | null;
 };
 
-function Thumb({ url, path }: { url?: string | null; path?: string | null }) {
-  const [u, setU] = useState<string | null>(url ?? null);
-  useEffect(() => {
-    let dead = false;
-    if (url) { setU(url); return; }
-    if (!path) { setU(null); return; }
-    getDownloadURL(ref(storage, path)).then((x) => !dead && setU(x)).catch(() => !dead && setU(null));
-    return () => { dead = true; };
-  }, [url, path]);
-  return (
-    <div className="w-[72px] h-[48px] rounded-lg overflow-hidden bg-gray-100 text-[10px] text-gray-400 grid place-items-center">
-      {u ? <img src={u} alt="" className="w-full h-full object-cover" /> : "NO IMAGE"}
-    </div>
-  );
-}
-
 export default function JobsPage() {
-  const nav = useNavigate();
-  const [jobs, setJobs] = useState<PublicJob[]>([]);
+  const [jobs, setJobs] = useState<PublicJobMeta[]>([]);
+  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    const u = onSnapshot(
-      query(collection(db, `organizations/${ORG_ID}/publicJobs`), orderBy("publishedAt", "desc")),
-      (snap) => setJobs(snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })))
-    );
-    return () => u();
+    const col = collection(db, `organizations/${ORG_ID}/publicJobs`);
+    const qy = query(col, orderBy("publishedAt", "desc"));
+
+    const unsub = onSnapshot(qy, (snap) => {
+      const list = snap.docs.map((d) => ({
+        id: d.id,
+        ...(d.data() as any),
+      }));
+      setJobs(list);
+      setLoading(false);
+    });
+
+    return () => unsub();
   }, []);
 
+  async function handleDelete(id: string) {
+    if (!confirm("本当に削除しますか？この求人の公開ページも消えます。")) return;
+    await deleteDoc(doc(db, `organizations/${ORG_ID}/publicJobs/${id}`));
+    alert("削除しました");
+  }
+
   return (
-    <div className="p-6 space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="p-6">
+      <div className="flex items-center justify-between mb-6">
         <h1 className="text-xl font-semibold">求人ページ一覧</h1>
-        <Link to="/jobs/new" className="px-3 py-1.5 rounded-lg bg-[#f579a4] text-white text-sm hover:opacity-90">
-          かんたん求人ページ作成
+
+        <Link
+          to="/jobs/new"
+          className="px-4 py-2 rounded-xl bg-[#f579a4] text-white hover:opacity-90"
+        >
+          求人ページを新規作成
         </Link>
       </div>
 
-      {jobs.length === 0 ? (
-        <div className="text-sm text-gray-500">まだ公開済みの求人はありません。</div>
-      ) : (
-        <ul className="space-y-3">
-          {jobs.map((j) => {
-            const publicPath = `/p/${ORG_ID}/jobs/${j.id}`;
-            const editPath = `/jobs/${j.id}/edit`;
-            return (
-              <li key={j.id} className="rounded-xl border border-black/5 bg-white p-3 flex items-center gap-3">
-                <Thumb url={j.thumbnailURL ?? null} path={j.thumbnailPath ?? null} />
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium truncate">{j.title || "(無題)"}</div>
-                  <div className="text-xs text-gray-500">
-                    {j.publishedAt?.toDate?.()?.toLocaleString?.() ?? ""}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button className="px-3 py-1 rounded-lg border hover:bg-black/5" onClick={() => nav(editPath)}>
-                    編集
-                  </button>
-                  <a className="px-3 py-1 rounded-lg border hover:bg-black/5" href={publicPath} target="_blank" rel="noopener">
-                    開く
-                  </a>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+      {loading && (
+        <div className="space-y-3 animate-pulse">
+          <div className="h-16 bg-black/5 rounded-lg"></div>
+          <div className="h-16 bg-black/5 rounded-lg"></div>
+        </div>
       )}
+
+      {!loading && jobs.length === 0 && (
+        <div className="text-sm text-gray-500">求人ページはありません。</div>
+      )}
+
+      <div className="grid gap-4">
+        {jobs.map((job) => (
+          <div
+            key={job.id}
+            className="group flex gap-4 rounded-xl bg-white border border-black/5 p-4"
+          >
+            {/* サムネ */}
+            <div className="w-32 h-24 rounded-lg bg-gray-100 overflow-hidden">
+              {job.thumbnailURL ? (
+                <img src={job.thumbnailURL} className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full grid place-items-center text-gray-400 text-xs">
+                  NO IMAGE
+                </div>
+              )}
+            </div>
+
+            {/* 詳細 */}
+            <div className="flex-1">
+              <h2 className="text-lg font-semibold">{job.title}</h2>
+
+              <div className="text-sm text-gray-600 mt-1">
+                {job.facilityName}（{job.facilityType}）
+              </div>
+
+              <div className="text-pink-600 font-medium mt-1">{job.wage}</div>
+
+              <div className="text-sm text-gray-500">{job.employmentType}</div>
+              <div className="text-sm text-gray-500">{job.workingHours}</div>
+
+              <div className="text-xs opacity-60 mt-2">
+                公開日：
+                {job.publishedAt?.toDate
+                  ? job.publishedAt.toDate().toLocaleString("ja-JP")
+                  : "—"}
+              </div>
+
+              {/* ボタン類 */}
+              <div className="flex gap-3 mt-4 text-sm">
+                <Link
+                  to={`/jobs/${job.id}/edit`}
+                  className="text-[#f579a4] hover:underline"
+                >
+                  編集
+                </Link>
+
+                <Link
+                  to={`/p/${ORG_ID}/jobs/${job.id}`}
+                  className="text-blue-500 hover:underline"
+                  target="_blank"
+                >
+                  公開LPを開く
+                </Link>
+
+                <button
+                  onClick={() => handleDelete(job.id)}
+                  className="text-red-500 hover:underline"
+                >
+                  削除
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
